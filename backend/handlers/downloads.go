@@ -43,8 +43,7 @@ func DownloadHandler(ctx context.Context, input *struct {
 		YtDlpArgs string `required:"false" example:"--arg arg_value --second-arg --third-arg" doc:"Pass additional args to yt-dlp" json:"yt_dlp_args"`
 	}
 }) (*DownloadResponse, error) {
-	// isProduction := os.Getenv("GO_ENV") == "production"
-	isDevelopment := os.Getenv("GO_ENV") == "development" || os.Getenv("GO_ENV") == ""
+	isDevelopment := utils.IsDevelopment()
 	isYoutube := strings.Contains(input.Body.Url, "youtube.com") || strings.Contains(input.Body.Url, "youtu.be")
 
 	allFilesInDownloadDir, err := getFileNamesInDownloadDir()

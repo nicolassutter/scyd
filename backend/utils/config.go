@@ -12,7 +12,6 @@ type config struct {
 	OutputDir   string `yaml:"output_dir"`
 	// Automatically sort downloads after each download completes
 	SortAfterDownload bool `yaml:"sort_after_download"`
-	AllowOrigins	  []string `yaml:"allow_origins"`
 }
 
 func newConfig() *config {
@@ -25,6 +24,10 @@ func newConfig() *config {
 }
 
 var UserConfig = newConfig()
+
+func IsDevelopment() bool {
+	return os.Getenv("GO_ENV") == "development" || os.Getenv("GO_ENV") == ""
+}
 
 func ReadUserConfigFile() (*config, error) {
 	file, err := os.Open("./config/config.yaml")

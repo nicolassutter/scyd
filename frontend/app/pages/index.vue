@@ -37,7 +37,6 @@ const mutation = useMutation({
 
     const output = await postApiV1Download({
       body: { url: data.url },
-      throwOnError: true,
     });
 
     return output.data;
