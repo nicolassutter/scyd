@@ -135,7 +135,7 @@ func DownloadHandler(ctx context.Context, input *struct {
 
 		return &DownloadResponse{
 			Body: DownloadResponseBody{
-				Message:         "Successfully downloaded from yt-dlp",
+				Message:         "Successfully downloaded with yt-dlp!",
 				DownloadedFiles: getNewlyDownloadedFiles(),
 			},
 		}, nil
@@ -192,7 +192,7 @@ func DownloadHandler(ctx context.Context, input *struct {
 
 		return &DownloadResponse{
 			Body: DownloadResponseBody{
-				Message:         "Successfully downloaded from streamrip with",
+				Message:         "Successfully downloaded with streamrip!",
 				DownloadedFiles: getNewlyDownloadedFiles(),
 			},
 		}, nil

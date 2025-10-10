@@ -1,4 +1,4 @@
 .PHONY: build
 
 build:
-	go build -o bin/backend main.go
+	GO_ENV=production go build -o bin/scyd main.go
