@@ -1,22 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humafiber"
 	"github.com/dhowden/tag"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/shlex"
 	"gopkg.in/yaml.v3"
 )
-
-type DownloadRequest struct {
-	Url       string `json:"url"`
-	YtDlpArgs string `json:"yt_dlp_args"`
-}
 
 func getMetadataFromFile(audioFilePath string) (tag.Metadata, error) {
 	// Check if the file exists
@@ -44,52 +42,60 @@ func getMetadataFromFile(audioFilePath string) (tag.Metadata, error) {
 type Config struct {
 	DownloadDir string `yaml:"download_dir"`
 	OutputDir   string `yaml:"output_dir"`
+	// Automatically sort downloads after each download completes
+	SortAfterDownload bool `yaml:"sort_after_download"`
+}
+
+func newConfig() *Config {
+	config := &Config{
+		DownloadDir:       "/downloads",
+		OutputDir:         "/output",
+		SortAfterDownload: true,
+	}
+	return config
 }
 
 func readConfigFile() (*Config, error) {
-	config := new(Config)
+	parsedConfig := newConfig()
+
 	file, err := os.Open("./config/config.yaml")
 
 	if err != nil {
-		return config, err
+		return nil, err
 	}
 
 	defer file.Close()
 
 	decoder := yaml.NewDecoder(file)
-	err = decoder.Decode(&config)
+	err = decoder.Decode(parsedConfig)
 
 	if err != nil {
 		fmt.Println("Error reading config file, using defaults.")
-	}
-
-	fmt.Println("Config file found!")
-
-	defaults := Config{
-		DownloadDir: "/downloads",
-		OutputDir:   "/output",
-	}
-
-	if config.DownloadDir == "" {
-		config.DownloadDir = defaults.DownloadDir
-	}
-	if config.OutputDir == "" {
-		config.OutputDir = defaults.OutputDir
+	} else {
+		fmt.Println("Config file found!")
 	}
 
 	// ensure the download dir exists
-	err = os.MkdirAll(config.DownloadDir, os.ModePerm)
+	err = os.MkdirAll(parsedConfig.DownloadDir, os.ModePerm)
 	if err != nil {
-		return config, err
+		return parsedConfig, err
 	}
 
 	// ensure the output dir exists
-	err = os.MkdirAll(config.OutputDir, os.ModePerm)
+	err = os.MkdirAll(parsedConfig.OutputDir, os.ModePerm)
 	if err != nil {
-		return config, err
+		return parsedConfig, err
 	}
 
-	return config, nil
+	return parsedConfig, nil
+}
+
+type DownloadResponse struct {
+	Status int
+	Body   DownloadResponseBody
+}
+type DownloadResponseBody struct {
+	Message string `json:"message"`
 }
 
 func main() {
@@ -102,28 +108,24 @@ func main() {
 		log.Printf("Failed to read config file: %v", err)
 	}
 
-	app := fiber.New()
-	appv1 := app.Group("/api/v1")
+	fiberApp := fiber.New()
+	api := humafiber.New(fiberApp, huma.DefaultConfig("scyd REST API", "1.0.0"))
 
-	appv1.Post("/download", func(c *fiber.Ctx) error {
-		req := new(DownloadRequest)
+	api_v1 := huma.NewGroup(api, "/api/v1")
 
-		if err := c.BodyParser(req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Cannot parse JSON",
-			})
+	huma.Post(api_v1, "/download", func(ctx context.Context, input *struct {
+		Body struct {
+			Url       string `json:"url"`
+			YtDlpArgs string `json:"yt_dlp_args"`
 		}
-
-		isYoutube := strings.Contains(req.Url, "youtube.com") || strings.Contains(req.Url, "youtu.be")
+	}) (*DownloadResponse, error) {
+		isYoutube := strings.Contains(input.Body.Url, "youtube.com") || strings.Contains(input.Body.Url, "youtu.be")
 
 		if isYoutube {
-			additionalArgs, err := shlex.Split(req.YtDlpArgs)
+			additionalArgs, err := shlex.Split(input.Body.YtDlpArgs)
 
 			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-					"error":  "Failed to parse yt-dlp arguments",
-					"detail": err.Error(),
-				})
+				return nil, huma.Error400BadRequest(("Failed to parse yt-dlp args: " + err.Error()))
 			}
 
 			devDockerPrefix := []string{
@@ -163,7 +165,7 @@ func main() {
 			command = append(command, additionalArgs...)
 
 			// finally add the url
-			command = append(command, req.Url)
+			command = append(command, input.Body.Url)
 
 			cmd := exec.Command(command[0], command[1:]...)
 
@@ -172,16 +174,14 @@ func main() {
 			_, err = cmd.Output()
 
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error":  "Failed to execute command",
-					"detail": err.Error(),
-					"stderr": err.(*exec.ExitError).Stderr,
-				})
+				return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
 			}
 
-			return c.JSON(fiber.Map{
-				"message": "Successfully downloaded from Youtube with: " + req.Url,
-			})
+			return &DownloadResponse{
+				Body: DownloadResponseBody{
+					Message: "Successfully downloaded from Youtube with: " + input.Body.Url,
+				},
+			}, nil
 		} else {
 			// handle other platforms like Soundcloud with streamrip
 
@@ -199,7 +199,7 @@ func main() {
 				"-f",
 				config.DownloadDir,
 				"url",
-				req.Url,
+				input.Body.Url,
 			}
 
 			command := []string{}
@@ -220,57 +220,36 @@ func main() {
 			_, err := cmd.Output()
 
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error":  "Failed to execute command",
-					"detail": err.Error(),
-					"stderr": err.(*exec.ExitError).Stderr,
-				})
+				return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
 			}
 
-			return c.JSON(fiber.Map{
-				"message": "Successfully downloaded from SoundCloud with: " + req.Url,
-			})
+			return &DownloadResponse{
+				Body: DownloadResponseBody{
+					Message: "Successfully downloaded from SoundCloud with: " + input.Body.Url,
+				},
+			}, nil
 		}
 	})
 
-	appv1.Get("/metadata", func(c *fiber.Ctx) error {
-		audioFilePath := c.Query("file")
-
-		if audioFilePath == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "File query parameter is required",
-			})
-		}
-
-		metadata, err := getMetadataFromFile(audioFilePath)
-
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error":  "Failed to get metadata",
-				"detail": err.Error(),
-			})
-		}
-
-		return c.JSON(fiber.Map{
-			"title":  metadata.Title(),
-			"artist": metadata.Artist(),
-			"album":  metadata.Album(),
-			"year":   metadata.Year(),
-		})
-	})
+	type SortDownloadsResponseBody struct {
+		MovedFiles      []string `json:"moved_files"`
+		FilesWithErrors []string `json:"files_with_errors"`
+	}
+	type SortDownloadsResponse struct {
+		Body SortDownloadsResponseBody
+	}
 
 	// sort every audio file in the downloads dir into artist/album folders, then move them to the output dir
-	appv1.Post("/sort-downloads", func(c *fiber.Ctx) error {
+	huma.Post(api_v1, "/sort-downloads", func(c context.Context, input *struct{}) (*SortDownloadsResponse, error) {
 		files, err := os.ReadDir(config.DownloadDir)
 
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error":  "Failed to read download directory",
-				"detail": err.Error(),
-			})
+			log.Printf("Failed to read download directory: %v", err)
+			return nil, huma.Error500InternalServerError("Failed to read download directory")
 		}
 
 		movedFiles := []string{}
+		filesWithErrors := []string{}
 
 		for _, file := range files {
 			if file.IsDir() {
@@ -281,6 +260,7 @@ func main() {
 			metadata, err := getMetadataFromFile(filePath)
 
 			if err != nil {
+				// if we fail to get metadata, skip the file as it might not be an audio file
 				log.Printf("Failed to get metadata for file %s: %v", filePath, err)
 				continue
 			}
@@ -301,6 +281,7 @@ func main() {
 
 			if err != nil {
 				log.Printf("Failed to create directory %s: %v", newDir, err)
+				filesWithErrors = append(filesWithErrors, filePath)
 				continue
 			}
 
@@ -311,16 +292,20 @@ func main() {
 
 			if err != nil {
 				log.Printf("Failed to move file %s to %s: %v", filePath, newFilePath, err)
+				filesWithErrors = append(filesWithErrors, filePath)
 				continue
 			}
 
 			movedFiles = append(movedFiles, newFilePath)
 		}
 
-		return c.JSON(fiber.Map{
-			"moved_files": movedFiles,
-		})
+		return &SortDownloadsResponse{
+			Body: SortDownloadsResponseBody{
+				MovedFiles:      movedFiles,
+				FilesWithErrors: filesWithErrors,
+			},
+		}, nil
 	})
 
-	app.Listen(":3000")
+	fiberApp.Listen(":3000")
 }
