@@ -41,5 +41,9 @@ func main() {
 			},
 		}, nil
 	})
+
+	if !utils.IsDevelopment() {
+		fiberApp.Static("/", "./public")
+	}
 	fiberApp.Listen(":3000")
 }

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -33,30 +34,30 @@ func ReadUserConfigFile() (*config, error) {
 	file, err := os.Open("./config/config.yaml")
 
 	if err != nil {
-		return nil, err
-	}
-
-	defer file.Close()
-
-	decoder := yaml.NewDecoder(file)
-	err = decoder.Decode(UserConfig)
-
-	if err != nil {
-		fmt.Println("Error reading config file, using defaults.")
+		fmt.Println("Could not read config file, using defaults.")
 	} else {
-		fmt.Println("Config file found!")
+		defer file.Close()
+
+		decoder := yaml.NewDecoder(file)
+		err = decoder.Decode(UserConfig)
+
+		if err != nil {
+			fmt.Println("Error reading config file, using defaults.")
+		} else {
+			fmt.Println("Config file found!")
+		}
 	}
 
 	// ensure the download dir exists
 	err = os.MkdirAll(UserConfig.DownloadDir, os.ModePerm)
 	if err != nil {
-		return UserConfig, err
+		log.Fatalf("Error creating %s dir: %s", err, UserConfig.DownloadDir)
 	}
 
 	// ensure the output dir exists
 	err = os.MkdirAll(UserConfig.OutputDir, os.ModePerm)
 	if err != nil {
-		return UserConfig, err
+		log.Fatalf("Error creating %s dir: %s", err, UserConfig.OutputDir)
 	}
 
 	return UserConfig, nil
