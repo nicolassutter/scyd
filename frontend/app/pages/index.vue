@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import * as z from "zod";
-import type { FormSubmitEvent } from "@nuxt/ui";
 import { useMutation } from "@tanstack/vue-query";
+import { postApiV1Download } from "~/utils/client";
+import type { FormSubmitEvent } from "@nuxt/ui";
 
 const schema = z.object({
   url: z.url(),
@@ -13,25 +14,56 @@ const state = reactive<Partial<Schema>>({
   url: undefined,
 });
 
-const downloadItems = ref<{ url: string; loading: boolean }[]>([]);
+const downloadItems = ref<
+  {
+    id: string;
+    url: string;
+    loading: boolean;
+    error?: string;
+    thumbnailUrl?: string;
+    downloadedFiles: string[];
+  }[]
+>([]);
 
 const mutation = useMutation({
   mutationKey: ["download", downloadItems],
-  mutationFn: async (data: Schema) => {
-    downloadItems.value.push({ url: data.url, loading: true });
-
-    await $fetch("/api/v1/download", {
-      method: "POST",
-      body: data,
+  mutationFn: async (data: Schema & { id: string }) => {
+    downloadItems.value.push({
+      id: data.id,
+      url: data.url,
+      loading: true,
+      downloadedFiles: [],
     });
 
-    return data;
+    const output = await postApiV1Download({
+      body: { url: data.url },
+      throwOnError: true,
+    });
+
+    return output.data;
   },
-  onSettled: (data: Schema) => {
-    const idx = downloadItems.value.findIndex((item) => item.url === data.url);
-    if (idx > -1) item.loading = false;
+  onSettled: (response, err, { id }) => {
+    downloadItems.value = downloadItems.value.map((item) => {
+      // update the status of the item that matches the id
+      if (item.id === id) {
+        return {
+          ...item,
+          loading: false,
+          error: err
+            ? "Failed to download, check the server logs for details."
+            : undefined,
+          downloadedFiles: response?.downloaded_files ?? [],
+        };
+      }
+
+      return item;
+    });
   },
 });
+
+function handleSubmit(event: FormSubmitEvent<Schema>) {
+  mutation.mutate({ ...event.data, id: crypto.randomUUID() });
+}
 </script>
 
 <template>
@@ -42,7 +74,7 @@ const mutation = useMutation({
       :schema="schema"
       :state="state"
       class="flex gap-4 items-start justify-center w-full"
-      @submit="(event) => mutation.mutate(event.data)"
+      @submit="handleSubmit"
     >
       <UFormField name="url" class="w-full max-w-xl">
         <UInput
@@ -60,8 +92,13 @@ const mutation = useMutation({
     <h2 class="text-lg font-semibold mb-4">Your downloads</h2>
 
     <div class="grid gap-2 w-full">
-      <template v-for="item in downloadItems">
-        <DownloadItem :url="item.url" :loading="item.loading"></DownloadItem>
+      <template v-for="item in downloadItems" :key="item.id">
+        <DownloadItem
+          :url="item.url"
+          :loading="item.loading"
+          :error="item.error"
+          :downloaded-files="item.downloadedFiles"
+        />
       </template>
     </div>
   </UContainer>
