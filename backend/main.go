@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humafiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/nicolassutter/scyd/handlers"
 	"github.com/nicolassutter/scyd/utils"
 )
@@ -15,6 +18,10 @@ func main() {
 	utils.ReadUserConfigFile()
 
 	fiberApp := fiber.New()
+	fiberApp.Use(cors.New(cors.Config{
+		AllowOrigins: strings.Join(slices.Compact(utils.UserConfig.AllowOrigins), ","),
+		AllowCredentials: true,
+	}))
 
 	api := humafiber.New(fiberApp, huma.DefaultConfig("scyd REST API", "1.0.0"))
 

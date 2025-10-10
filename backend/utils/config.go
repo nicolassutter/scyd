@@ -2,8 +2,9 @@ package utils
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type config struct {
@@ -11,6 +12,7 @@ type config struct {
 	OutputDir   string `yaml:"output_dir"`
 	// Automatically sort downloads after each download completes
 	SortAfterDownload bool `yaml:"sort_after_download"`
+	AllowOrigins	  []string `yaml:"allow_origins"`
 }
 
 func newConfig() *config {
