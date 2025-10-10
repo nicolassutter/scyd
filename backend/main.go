@@ -95,6 +95,9 @@ func readConfigFile() (*Config, error) {
 func main() {
 	config, err := readConfigFile()
 
+	// isProduction := os.Getenv("GO_ENV") == "production"
+	isDevelopment := os.Getenv("GO_ENV") == "development" || os.Getenv("GO_ENV") == ""
+
 	if err != nil {
 		log.Printf("Failed to read config file: %v", err)
 	}
@@ -112,7 +115,6 @@ func main() {
 		}
 
 		isYoutube := strings.Contains(req.Url, "youtube.com") || strings.Contains(req.Url, "youtu.be")
-		// isSoundCloud := strings.Contains(req.Url, "soundcloud.com")
 
 		if isYoutube {
 			additionalArgs, err := shlex.Split(req.YtDlpArgs)
@@ -124,16 +126,19 @@ func main() {
 				})
 			}
 
-			command := []string{
+			devDockerPrefix := []string{
 				"docker",
 				"run",
 				"--rm",
 				"-v",
-				config.DownloadDir + ":/downloads",
+				config.DownloadDir + ":" + config.DownloadDir,
 				"scyd",
+			}
+
+			ytDlpBaseCommand := []string{
 				"yt-dlp",
 				"-o",
-				"/downloads/%(title)s.%(ext)s",
+				config.DownloadDir + "/%(title)s.%(ext)s",
 				"--extract-audio",
 				"--audio-format",
 				"mp3",
@@ -143,8 +148,20 @@ func main() {
 				"--add-metadata",
 			}
 
+			command := []string{}
+
+			// run inside a docker container in development
+			if isDevelopment {
+				command = append(command, devDockerPrefix...)
+				command = append(command, ytDlpBaseCommand...)
+			} else {
+				// in production just run yt-dlp directly
+				command = append(command, ytDlpBaseCommand...)
+			}
+
 			// add additional args from request
 			command = append(command, additionalArgs...)
+
 			// finally add the url
 			command = append(command, req.Url)
 
@@ -166,19 +183,37 @@ func main() {
 				"message": "Successfully downloaded from Youtube with: " + req.Url,
 			})
 		} else {
-			cmd := exec.Command(
+			// handle other platforms like Soundcloud with streamrip
+
+			devDockerPrefix := []string{
 				"docker",
 				"run",
 				"--rm",
 				"-v",
-				config.DownloadDir+":/downloads",
+				config.DownloadDir + ":" + config.DownloadDir,
 				"scyd",
+			}
+
+			baseCmd := []string{
 				"rip",
 				"-f",
-				"/downloads",
+				config.DownloadDir,
 				"url",
 				req.Url,
-			)
+			}
+
+			command := []string{}
+
+			// run inside a docker container in development
+			if isDevelopment {
+				command = append(command, devDockerPrefix...)
+				command = append(command, baseCmd...)
+			} else {
+				// in production just run rip directly
+				command = append(command, baseCmd...)
+			}
+
+			cmd := exec.Command(command[0], command[1:]...)
 
 			println("Executing command:", strings.Join(cmd.Args, " "))
 
