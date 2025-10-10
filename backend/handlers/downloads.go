@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"slices"
@@ -13,8 +14,7 @@ import (
 )
 
 type DownloadResponse struct {
-	Status int
-	Body   DownloadResponseBody
+	Body DownloadResponseBody
 }
 type DownloadResponseBody struct {
 	Message         string   `json:"message"`
@@ -77,6 +77,8 @@ func DownloadHandler(ctx context.Context, input *struct {
 		return nil, huma.Error500InternalServerError("Failed to read download directory: " + err.Error())
 	}
 
+	responseBody := &DownloadResponseBody{}
+
 	if isYoutube {
 		additionalArgs, err := shlex.Split(input.Body.YtDlpArgs)
 
@@ -127,18 +129,17 @@ func DownloadHandler(ctx context.Context, input *struct {
 
 		println("Executing command:", strings.Join(cmd.Args, " "))
 
-		_, err = cmd.Output()
+		out, err := cmd.CombinedOutput()
 
 		if err != nil {
+			fmt.Printf("Command error output: %s\n", out)
 			return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
 		}
 
-		return &DownloadResponse{
-			Body: DownloadResponseBody{
-				Message:         "Successfully downloaded with yt-dlp!",
-				DownloadedFiles: getNewlyDownloadedFiles(),
-			},
-		}, nil
+		responseBody = &DownloadResponseBody{
+			Message:         "Successfully downloaded with yt-dlp!",
+			DownloadedFiles: getNewlyDownloadedFiles(),
+		}
 	} else {
 		// handle other platforms like Soundcloud with streamrip
 
@@ -174,9 +175,10 @@ func DownloadHandler(ctx context.Context, input *struct {
 
 		println("Executing command:", strings.Join(cmd.Args, " "))
 
-		_, err := cmd.Output()
+		out, err := cmd.CombinedOutput()
 
 		if err != nil {
+			fmt.Printf("Command error output: %s\n", out)
 			return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
 		}
 
@@ -190,11 +192,23 @@ func DownloadHandler(ctx context.Context, input *struct {
 			}
 		}
 
-		return &DownloadResponse{
-			Body: DownloadResponseBody{
-				Message:         "Successfully downloaded with streamrip!",
-				DownloadedFiles: getNewlyDownloadedFiles(),
-			},
-		}, nil
+		responseBody = &DownloadResponseBody{
+			Message:         "Successfully downloaded with streamrip!",
+			DownloadedFiles: getNewlyDownloadedFiles(),
+		}
 	}
+
+	fmt.Printf("Downloaded %s to %s\n", input.Body.Url, utils.UserConfig.DownloadDir)
+
+	if utils.UserConfig.SortAfterDownload {
+		_, err := SortDownloadsDirectory()
+
+		if err != nil {
+			println("Failed to sort downloads after download:", err.Error())
+		}
+	}
+
+	return &DownloadResponse{
+		Body: *responseBody,
+	}, nil
 }

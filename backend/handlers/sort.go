@@ -18,7 +18,7 @@ type SortDownloadsResponse struct {
 }
 
 // sort every audio file in the downloads dir into artist/album folders, then move them to the output dir
-func SortDownloadsHandler(c context.Context, input *struct{}) (*SortDownloadsResponse, error) {
+func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 	files, err := os.ReadDir(utils.UserConfig.DownloadDir)
 
 	if err != nil {
@@ -83,4 +83,8 @@ func SortDownloadsHandler(c context.Context, input *struct{}) (*SortDownloadsRes
 			FilesWithErrors: filesWithErrors,
 		},
 	}, nil
+}
+
+func SortDownloadsHandler(c context.Context, input *struct{}) (*SortDownloadsResponse, error) {
+	return SortDownloadsDirectory()
 }
