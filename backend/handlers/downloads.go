@@ -180,6 +180,16 @@ func DownloadHandler(ctx context.Context, input *struct {
 			return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
 		}
 
+		// delete cover.jpg if one has been downloaded
+		coverPath := utils.UserConfig.DownloadDir + "/cover.jpg"
+		if _, err := os.Stat(coverPath); err == nil {
+			err := os.Remove(coverPath)
+
+			if err != nil {
+				println("Failed to delete cover.jpg:", err.Error())
+			}
+		}
+
 		return &DownloadResponse{
 			Body: DownloadResponseBody{
 				Message:         "Successfully downloaded from streamrip with",
