@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 
@@ -15,6 +16,33 @@ type SortDownloadsResponseBody struct {
 }
 type SortDownloadsResponse struct {
 	Body SortDownloadsResponseBody
+}
+
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Copy file permissions
+	sourceInfo, err := sourceFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, sourceInfo.Mode())
 }
 
 // sort every audio file in the downloads dir into artist/album folders, then move them to the output dir
@@ -65,13 +93,22 @@ func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 
 		newFilePath := newDir + "/" + file.Name()
 
-		// move the file
-		err = os.Rename(filePath, newFilePath)
+		// copy the file to the new location
+		err = copyFile(filePath, newFilePath)
 
 		if err != nil {
-			log.Printf("Failed to move file %s to %s: %v", filePath, newFilePath, err)
+			log.Printf("Failed to copy file %s to %s: %v", filePath, newFilePath, err)
 			filesWithErrors = append(filesWithErrors, filePath)
 			continue
+		}
+
+		// remove the original file
+		err = os.Remove(filePath)
+
+		if err != nil {
+			log.Printf("Failed to remove original file %s: %v", filePath, err)
+			// Note: file was copied successfully, so we still count it as moved
+			// but we could optionally clean up the copy if removal fails
 		}
 
 		movedFiles = append(movedFiles, newFilePath)
