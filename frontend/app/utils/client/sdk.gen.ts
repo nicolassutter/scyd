@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetApiV1StatusData, GetApiV1StatusErrors, GetApiV1StatusResponses, PostApiV1DownloadData, PostApiV1DownloadErrors, PostApiV1DownloadResponses, PostApiV1SortDownloadsData, PostApiV1SortDownloadsErrors, PostApiV1SortDownloadsResponses } from './types.gen';
+import type { DownloadStreamData, DownloadStreamErrors, DownloadStreamResponses, GetApiV1StatusData, GetApiV1StatusErrors, GetApiV1StatusResponses, PostApiV1DownloadData, PostApiV1DownloadErrors, PostApiV1DownloadResponses, PostApiV1SortDownloadsData, PostApiV1SortDownloadsErrors, PostApiV1SortDownloadsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -29,6 +29,13 @@ export const postApiV1Download = <ThrowOnError extends boolean = false>(options:
             'Content-Type': 'application/json',
             ...options.headers
         }
+    });
+};
+
+export const downloadStream = <ThrowOnError extends boolean = false>(options: Options<DownloadStreamData, ThrowOnError>) => {
+    return (options.client ?? client).sse.get<DownloadStreamResponses, DownloadStreamErrors, ThrowOnError>({
+        url: '/api/v1/download/stream/{task_id}',
+        ...options
     });
 };
 

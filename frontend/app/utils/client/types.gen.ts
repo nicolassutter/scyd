@@ -4,13 +4,25 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:3000' | (string & {});
 };
 
+export type DownloadNotFoundEvent = {
+    [key: string]: never;
+};
+
 export type DownloadResponseBody = {
     /**
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
-    downloaded_files?: Array<string> | null;
     message: string;
+    task_id: string;
+};
+
+export type DownloadStdoutNewLineEvent = {
+    line: string;
+};
+
+export type DownloadSuccessEvent = {
+    [key: string]: never;
 };
 
 export type ErrorDetail = {
@@ -81,8 +93,8 @@ export type SortDownloadsResponseBody = {
 };
 
 export type DownloadResponseBodyWritable = {
-    downloaded_files?: Array<string> | null;
     message: string;
+    task_id: string;
 };
 
 export type ErrorModelWritable = {
@@ -149,6 +161,76 @@ export type PostApiV1DownloadResponses = {
 };
 
 export type PostApiV1DownloadResponse = PostApiV1DownloadResponses[keyof PostApiV1DownloadResponses];
+
+export type DownloadStreamData = {
+    body?: never;
+    path: {
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/v1/download/stream/{task_id}';
+};
+
+export type DownloadStreamErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type DownloadStreamError = DownloadStreamErrors[keyof DownloadStreamErrors];
+
+export type DownloadStreamResponses = {
+    /**
+     * Server Sent Events
+     * Each oneOf object in the array represents one possible Server Sent Events (SSE) message, serialized as UTF-8 text according to the SSE specification.
+     */
+    200: Array<{
+        data: DownloadNotFoundEvent;
+        /**
+         * The event name.
+         */
+        event: 'download_not_found';
+        /**
+         * The event ID.
+         */
+        id?: number;
+        /**
+         * The retry time in milliseconds.
+         */
+        retry?: number;
+    } | {
+        data: DownloadSuccessEvent;
+        /**
+         * The event name.
+         */
+        event: 'download_success';
+        /**
+         * The event ID.
+         */
+        id?: number;
+        /**
+         * The retry time in milliseconds.
+         */
+        retry?: number;
+    } | {
+        data: DownloadStdoutNewLineEvent;
+        /**
+         * The event name.
+         */
+        event: 'new_line';
+        /**
+         * The event ID.
+         */
+        id?: number;
+        /**
+         * The retry time in milliseconds.
+         */
+        retry?: number;
+    }>;
+};
+
+export type DownloadStreamResponse = DownloadStreamResponses[keyof DownloadStreamResponses];
 
 export type PostApiV1SortDownloadsData = {
     body?: never;

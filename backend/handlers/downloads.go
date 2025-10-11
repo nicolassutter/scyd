@@ -1,15 +1,20 @@
 package handlers
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
-	"slices"
 	"strings"
+	"sync"
+
+	"encoding/json"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/shlex"
+	"github.com/google/uuid"
 	"github.com/nicolassutter/scyd/utils"
 )
 
@@ -17,24 +22,141 @@ type DownloadResponse struct {
 	Body DownloadResponseBody
 }
 type DownloadResponseBody struct {
-	Message         string   `json:"message"`
-	DownloadedFiles []string `json:"downloaded_files,omitempty"`
+	Message string `json:"message"`
+	TaskID  string `json:"task_id"`
 }
 
-func getFileNamesInDownloadDir() ([]string, error) {
-	files, err := os.ReadDir(utils.UserConfig.DownloadDir)
+var taskStatus = make(map[string]chan string) // map[TaskID] -> Channel for sending log lines
+var mu sync.Mutex                             // Mutex to safely access the map
 
+func startDownloadTask(taskId string, outputCh chan string, cmd *exec.Cmd) huma.StatusError {
+	defer func() {
+		// Clean up the map and close the channel when done
+		mu.Lock()
+		delete(taskStatus, taskId)
+		close(outputCh)
+		mu.Unlock()
+	}()
+
+	// Create pipes to capture both stdout and stderr
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		fmt.Println("Failed to get command stdout:", err.Error())
+		return huma.Error500InternalServerError("Failed to get command stdout: " + err.Error())
 	}
 
-	fileNames := []string{}
-
-	for _, file := range files {
-		fileNames = append(fileNames, file.Name())
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		fmt.Println("Failed to get command stderr:", err.Error())
+		return huma.Error500InternalServerError("Failed to get command stderr: " + err.Error())
 	}
 
-	return fileNames, nil
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		fmt.Println("Failed to start command:", err.Error())
+		return huma.Error500InternalServerError("Failed to start command: " + err.Error())
+	}
+
+	// 3. Read and Stream both stdout and stderr
+	// Use goroutines to read both streams concurrently
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Printf("STDOUT: %s\n", line)
+
+			select {
+			case outputCh <- line:
+			case <-context.Background().Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Printf("STDERR: %s\n", line)
+
+			select {
+			case outputCh <- line:
+			case <-context.Background().Done():
+				return
+			}
+		}
+	}()
+
+	// Wait for the command to finish and close the connection
+	cmd.Wait()
+
+	if utils.UserConfig.SortAfterDownload {
+		fmt.Printf("Sorting downloads directory %s\n", utils.UserConfig.DownloadDir)
+
+		_, err := SortDownloadsDirectory()
+
+		if err != nil {
+			fmt.Println("Failed to sort downloads after download:", err.Error())
+		}
+	}
+
+	// delete cover.jpg if one has been downloaded
+	coverPath := utils.UserConfig.DownloadDir + "/cover.jpg"
+	if _, err := os.Stat(coverPath); err == nil {
+		err := os.Remove(coverPath)
+
+		if err != nil {
+			println("Failed to delete cover.jpg:", err.Error())
+		}
+	}
+
+	return nil
+}
+
+type DownloadStdoutNewLineEvent struct {
+	Line string `json:"line" example:"[download] Downloading video 1 of 1"`
+}
+
+// RawDownloadStreamHandler handles SSE using raw Fiber without Huma's SSE wrapper
+func RawDownloadStreamHandler(c *fiber.Ctx) error {
+	taskID := c.Params("task_id")
+
+	// Set SSE headers
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+
+	mu.Lock()
+	ch, exists := taskStatus[taskID]
+	mu.Unlock()
+
+	if !exists {
+		// Send not found event, empty data
+		c.WriteString(fmt.Sprintf("event: download_not_found\ndata: %s\n\n", "{}"))
+		return nil
+	}
+
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		for line := range ch {
+			event := DownloadStdoutNewLineEvent{Line: line}
+			data, _ := json.Marshal(event)
+
+			// Write SSE format
+			fmt.Fprintf(w, "event: new_line\ndata: %s\n\n", string(data))
+
+			// Flush the writer
+			err := w.Flush()
+			if err != nil {
+				fmt.Printf("SSE flush error (continuing): %v\n", err)
+			}
+		}
+
+		// Send completion event, empty data
+		fmt.Fprintf(w, "event: download_success\ndata: %s\n\n", "{}")
+		w.Flush()
+	})
+
+	return nil
 }
 
 func DownloadHandler(ctx context.Context, input *struct {
@@ -43,40 +165,19 @@ func DownloadHandler(ctx context.Context, input *struct {
 		YtDlpArgs string `required:"false" example:"--arg arg_value --second-arg --third-arg" doc:"Pass additional args to yt-dlp" json:"yt_dlp_args"`
 	}
 }) (*DownloadResponse, error) {
+	// 1. Generate a unique Task ID
+	taskId := uuid.New().String()
+
+	// 2. Create a channel for this task's output
+	taskChannel := make(chan string)
+	mu.Lock()
+	taskStatus[taskId] = taskChannel
+	mu.Unlock()
+
 	isDevelopment := utils.IsDevelopment()
 	isYoutube := strings.Contains(input.Body.Url, "youtube.com") || strings.Contains(input.Body.Url, "youtu.be")
 
-	allFilesInDownloadDir, err := getFileNamesInDownloadDir()
-
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to read download directory: " + err.Error())
-	}
-
-	// helper function to get newly downloaded files by comparing files in download dir before and after download
-	getNewlyDownloadedFiles := func() []string {
-		currentFiles, err := getFileNamesInDownloadDir()
-
-		if err != nil {
-			return []string{}
-		}
-
-		fileNames := []string{}
-
-		// compare current files with files before download to get newly downloaded files
-		for _, fileName := range currentFiles {
-			if !slices.Contains(allFilesInDownloadDir, fileName) {
-				fileNames = append(fileNames, fileName)
-			}
-		}
-
-		return fileNames
-	}
-
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to read download directory: " + err.Error())
-	}
-
-	responseBody := &DownloadResponseBody{}
+	cmd := &exec.Cmd{}
 
 	if isYoutube {
 		additionalArgs, err := shlex.Split(input.Body.YtDlpArgs)
@@ -105,6 +206,9 @@ func DownloadHandler(ctx context.Context, input *struct {
 			"0",
 			"--embed-thumbnail",
 			"--add-metadata",
+			"--progress",  // Force progress output
+			"--newline",   // Force newlines in output
+			"--no-colors", // Disable colors for cleaner parsing
 		}
 
 		command := []string{}
@@ -124,21 +228,7 @@ func DownloadHandler(ctx context.Context, input *struct {
 		// finally add the url
 		command = append(command, input.Body.Url)
 
-		cmd := exec.Command(command[0], command[1:]...)
-
-		println("Executing command:", strings.Join(cmd.Args, " "))
-
-		out, err := cmd.CombinedOutput()
-
-		if err != nil {
-			fmt.Printf("Command error output: %s\n", out)
-			return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
-		}
-
-		responseBody = &DownloadResponseBody{
-			Message:         "Successfully downloaded with yt-dlp!",
-			DownloadedFiles: getNewlyDownloadedFiles(),
-		}
+		cmd = exec.Command(command[0], command[1:]...)
 	} else {
 		// handle other platforms like Soundcloud with streamrip
 
@@ -170,44 +260,19 @@ func DownloadHandler(ctx context.Context, input *struct {
 			command = append(command, baseCmd...)
 		}
 
-		cmd := exec.Command(command[0], command[1:]...)
-
-		println("Executing command:", strings.Join(cmd.Args, " "))
-
-		out, err := cmd.CombinedOutput()
-
-		if err != nil {
-			fmt.Printf("Command error output: %s\n", out)
-			return nil, huma.Error500InternalServerError("Failed to execute command: " + err.Error())
-		}
-
-		// delete cover.jpg if one has been downloaded
-		coverPath := utils.UserConfig.DownloadDir + "/cover.jpg"
-		if _, err := os.Stat(coverPath); err == nil {
-			err := os.Remove(coverPath)
-
-			if err != nil {
-				println("Failed to delete cover.jpg:", err.Error())
-			}
-		}
-
-		responseBody = &DownloadResponseBody{
-			Message:         "Successfully downloaded with streamrip!",
-			DownloadedFiles: getNewlyDownloadedFiles(),
-		}
+		cmd = exec.Command(command[0], command[1:]...)
 	}
 
-	fmt.Printf("Downloaded %s to %s\n", input.Body.Url, utils.UserConfig.DownloadDir)
+	// Start the download task in a separate goroutine so we don't block
+	go startDownloadTask(taskId, taskChannel, cmd)
 
-	if utils.UserConfig.SortAfterDownload {
-		_, err := SortDownloadsDirectory()
-
-		if err != nil {
-			println("Failed to sort downloads after download:", err.Error())
-		}
-	}
+	fmt.Printf("Download started for: %s to %s\n", input.Body.Url, utils.UserConfig.DownloadDir)
 
 	return &DownloadResponse{
-		Body: *responseBody,
+		Body: DownloadResponseBody{
+			Message: "Download started",
+			TaskID:  taskId,
+			// DownloadedFiles: newlyDownloadedFiles,
+		},
 	}, nil
 }

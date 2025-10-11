@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import * as z from "zod";
+import type { FormSubmitEvent } from "@nuxt/ui";
 import { useMutation } from "@tanstack/vue-query";
 import { postApiV1Download } from "~/utils/client";
-import type { FormSubmitEvent } from "@nuxt/ui";
 
 const schema = z.object({
   url: z.url(),
@@ -18,50 +18,27 @@ const downloadItems = ref<
   {
     id: string;
     url: string;
-    loading: boolean;
-    error?: string;
-    thumbnailUrl?: string;
-    downloadedFiles: string[];
   }[]
 >([]);
 
-const mutation = useMutation({
-  mutationKey: ["download", downloadItems],
-  mutationFn: async (data: Schema & { id: string }) => {
-    downloadItems.value.push({
-      id: data.id,
-      url: data.url,
-      loading: true,
-      downloadedFiles: [],
+const startDownloadMutation = useMutation({
+  mutationFn: async (url: string) => {
+    const response = await postApiV1Download({
+      body: { url },
     });
 
-    const output = await postApiV1Download({
-      body: { url: data.url },
-    });
-
-    return output.data;
+    return response.data;
   },
-  onSettled: (response, err, { id }) => {
-    downloadItems.value = downloadItems.value.map((item) => {
-      // update the status of the item that matches the id
-      if (item.id === id) {
-        return {
-          ...item,
-          loading: false,
-          error: err
-            ? "Failed to download, check the server logs for details."
-            : undefined,
-          downloadedFiles: response?.downloaded_files ?? [],
-        };
-      }
-
-      return item;
+  onSuccess: (data, inputUrl) => {
+    downloadItems.value.push({
+      id: data?.task_id,
+      url: inputUrl,
     });
   },
 });
 
-function handleSubmit(event: FormSubmitEvent<Schema>) {
-  mutation.mutate({ ...event.data, id: crypto.randomUUID() });
+async function handleSubmit(event: FormSubmitEvent<Schema>) {
+  startDownloadMutation.mutate(event.data.url);
 }
 </script>
 
@@ -92,12 +69,7 @@ function handleSubmit(event: FormSubmitEvent<Schema>) {
 
     <div class="grid gap-2 w-full">
       <template v-for="item in downloadItems" :key="item.id">
-        <DownloadItem
-          :url="item.url"
-          :loading="item.loading"
-          :error="item.error"
-          :downloaded-files="item.downloadedFiles"
-        />
+        <DownloadItem :id="item.id" :url="item.url" />
       </template>
     </div>
   </UContainer>

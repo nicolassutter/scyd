@@ -1,9 +1,11 @@
 <script setup lang="ts">
+// import { useEventSource } from "@vueuse/core";
+import z from "zod";
+import { client } from "~/utils/client/client.gen";
+
 const props = defineProps<{
+  id: string;
   url: string;
-  loading: boolean;
-  error?: string;
-  downloadedFiles: string[];
 }>();
 
 const thumbnailUrl = computed(() => {
@@ -22,6 +24,60 @@ const thumbnailUrl = computed(() => {
 
   return undefined;
 });
+
+const logsScroller = useTemplateRef<HTMLElement>("logsScroller");
+
+const logs = ref<string[]>([]);
+
+const evtSource = new EventSource(
+  client.buildUrl({
+    baseUrl: client.getConfig().baseUrl,
+    url: `/api/v1/download/stream/${props.id}`,
+  })
+);
+
+evtSource.addEventListener("new_line", (event) => {
+  try {
+    const data = z
+      .object({
+        line: z.string(),
+      })
+      .parse(JSON.parse(event.data));
+
+    logs.value.push(data.line);
+  } catch (error) {
+    console.error("Failed to parse new_line event data:", event.data, error);
+  }
+});
+
+evtSource.addEventListener("download_success", () => {
+  evtSource.close();
+  logs.value.push("✅ Download completed successfully.");
+});
+
+evtSource.onerror = (_error) => {
+  evtSource.close();
+  console.log("EventSource connection closed due to error.");
+};
+
+evtSource.onopen = () => {
+  console.log("EventSource connection opened");
+};
+
+onBeforeUnmount(() => {
+  evtSource.close();
+});
+
+watch(
+  logs,
+  () => {
+    // Auto-scroll to the bottom when new logs are added
+    if (logsScroller.value) {
+      logsScroller.value.scrollTop = logsScroller.value.scrollHeight;
+    }
+  },
+  { deep: true }
+);
 </script>
 
 <template>
@@ -38,22 +94,10 @@ const thumbnailUrl = computed(() => {
       />
     </div>
 
-    <p v-if="loading" class="flex gap-2 items-center">
-      Downloading...
-      <UIcon name="i-lucide:loader-circle" class="animate-spin" />
-    </p>
-
-    <div v-else-if="error" class="text-red-600">{{ error }}</div>
-
-    <div v-else-if="!loading && downloadedFiles.length === 0">
-      No files were downloaded.
-    </div>
-
-    <template v-else-if="!loading && downloadedFiles.length > 0">
-      <p class="font-bold">Downloaded files:</p>
-      <ul>
-        <li v-for="file in downloadedFiles" :key="file">{{ file }}</li>
-      </ul>
-    </template>
+    <ol ref="logsScroller" class="max-h-60 overflow-y-auto">
+      <li v-for="log in logs" :key="log" class="text-sm font-mono">
+        {{ log }}
+      </li>
+    </ol>
   </UCard>
 </template>

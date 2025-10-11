@@ -29,6 +29,8 @@ func main() {
 	api_v1 := huma.NewGroup(api, "/api/v1")
 
 	huma.Post(api_v1, "/download", handlers.DownloadHandler)
+	// Use a raw Fiber handler for SSE to avoid flushing issues
+	fiberApp.Get("/api/v1/download/stream/:task_id", handlers.RawDownloadStreamHandler)
 	huma.Post(api_v1, "/sort-downloads", handlers.SortDownloadsHandler)
 
 	type statusResponse struct {
