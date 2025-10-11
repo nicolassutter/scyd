@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// import { useEventSource } from "@vueuse/core";
 import z from "zod";
 import { client } from "~/utils/client/client.gen";
 
@@ -70,34 +69,60 @@ onBeforeUnmount(() => {
 
 watch(
   logs,
-  () => {
+  async () => {
     // Auto-scroll to the bottom when new logs are added
-    if (logsScroller.value) {
-      logsScroller.value.scrollTop = logsScroller.value.scrollHeight;
-    }
+    await nextTick(); // Wait for DOM to update
+
+    logsScroller.value?.scrollTo({
+      top: logsScroller.value.scrollHeight,
+      behavior: "smooth",
+    });
   },
   { deep: true }
 );
 </script>
 
 <template>
-  <UCard variant="subtle">
+  <UCard
+    variant="subtle"
+    class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl hover:border-slate-600/50 transition-colors"
+  >
     <template #header>
-      <h3 class="">{{ url }}</h3>
+      <div class="flex items-start gap-4">
+        <div
+          v-if="thumbnailUrl"
+          class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-slate-700"
+        >
+          <img :src="thumbnailUrl" alt="" class="w-full h-full object-cover" />
+        </div>
+        <div
+          v-else
+          class="w-16 h-16 rounded-lg flex-shrink-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center"
+        >
+          <UIcon name="i-lucide:download" class="w-8 h-8 text-blue-400" />
+        </div>
+
+        <h3 class="text-lg font-semibold text-white mb-1 truncate">
+          {{ props.url }}
+        </h3>
+      </div>
     </template>
 
-    <div v-if="thumbnailUrl" class="mb-4">
-      <img
-        :src="thumbnailUrl"
-        alt=""
-        class="max-w-lg aspect-video rounded-xl object-cover"
-      />
-    </div>
+    <div
+      ref="logsScroller"
+      class="bg-slate-900/50 rounded-lg p-4 font-mono text-sm max-h-48 overflow-y-auto"
+    >
+      <p v-if="!logs.length" class="text-slate-500 italic">
+        No logs to display.
+      </p>
 
-    <ol ref="logsScroller" class="max-h-60 overflow-y-auto">
-      <li v-for="log in logs" :key="log" class="text-sm font-mono">
+      <div
+        v-for="(log, index) in logs"
+        :key="index"
+        class="text-slate-300 mb-1 leading-relaxed"
+      >
         {{ log }}
-      </li>
-    </ol>
+      </div>
+    </div>
   </UCard>
 </template>
