@@ -46,6 +46,17 @@ func main() {
 
 	if !utils.IsDevelopment() {
 		fiberApp.Static("/", "./public")
+		/**
+		 * Serve manifest.webmanifest with correct MIME type
+		 */
+		fiberApp.Get("/manifest.webmanifest", func(c *fiber.Ctx) error {
+			err := c.SendFile("./public/manifest.webmanifest")
+			if err != nil {
+				return err
+			}
+			c.Set("Content-Type", "application/manifest+json")
+			return nil
+		})
 	}
 	fiberApp.Listen(":3000")
 }
