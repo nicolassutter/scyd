@@ -1,0 +1,22 @@
+services:
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      # Expose standard HTTP and HTTPS ports
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./.output/public:/public:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - caddy_data:/data
+    labels:
+      - caddy=https://localhost
+      - caddy.root=* /public
+      - caddy.encode
+      - caddy.try_files={path} /index.html
+      - caddy.file_server
+
+volumes:
+  caddy_data:

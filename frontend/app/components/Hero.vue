@@ -8,6 +8,10 @@ const schema = z.object({
   url: z.url(),
 });
 
+const route = useRoute();
+// when the app is installed as a PWA, users might share a URL to the app, which we will try to download
+const sharedUrl = computed(() => z.url().safeParse(route.query.url).data);
+
 type Schema = z.output<typeof schema>;
 
 const state = reactive<Partial<Schema>>({
@@ -36,6 +40,12 @@ const startDownloadMutation = useMutation({
     });
     state.url = "";
   },
+});
+
+onMounted(() => {
+  if (sharedUrl.value) {
+    startDownloadMutation.mutate(sharedUrl.value);
+  }
 });
 
 async function handleSubmit(event: FormSubmitEvent<Schema>) {
