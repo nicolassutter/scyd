@@ -9,8 +9,6 @@ const schema = z.object({
 });
 
 const route = useRoute();
-// when the app is installed as a PWA, users might share a URL to the app, which we will try to download
-const sharedUrl = computed(() => z.url().safeParse(route.query.url).data);
 
 type Schema = z.output<typeof schema>;
 
@@ -43,8 +41,21 @@ const startDownloadMutation = useMutation({
 });
 
 onMounted(() => {
-  if (sharedUrl.value) {
-    startDownloadMutation.mutate(sharedUrl.value);
+  // when the app is installed as a PWA, users might share a URL to the app, which we will try to download
+  const sharedUrl = z.url().safeParse(route.query.url).data;
+  const sharedText = z.string().safeParse(route.query.text).data;
+
+  // some apps put the URL inside the text field, so we try to extract it from there if needed
+  const urlInText = sharedText
+    ? (sharedText.match(
+        /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/g
+      ) || [])[0]
+    : null;
+
+  const urlToUse = sharedUrl || z.url().safeParse(urlInText).data;
+
+  if (urlToUse) {
+    startDownloadMutation.mutate(urlToUse);
   }
 });
 
