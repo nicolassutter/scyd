@@ -33,6 +33,8 @@ useHead({
   <UApp>
     <VitePwaManifest />
     <NuxtRouteAnnouncer />
-    <NuxtPage />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
   </UApp>
 </template>

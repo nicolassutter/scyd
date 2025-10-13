@@ -4,8 +4,23 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:3000' | (string & {});
 };
 
-export type DownloadNotFoundEvent = {
-    [key: string]: never;
+export type AuthStatusBody = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    authenticated: boolean;
+    username?: string;
+};
+
+export type AuthSuccessBody = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    message: string;
+    success: boolean;
+    username: string;
 };
 
 export type DownloadResponseBody = {
@@ -15,14 +30,6 @@ export type DownloadResponseBody = {
     readonly $schema?: string;
     message: string;
     task_id: string;
-};
-
-export type DownloadStdoutNewLineEvent = {
-    line: string;
-};
-
-export type DownloadSuccessEvent = {
-    [key: string]: never;
 };
 
 export type ErrorDetail = {
@@ -71,6 +78,21 @@ export type ErrorModel = {
     type?: string;
 };
 
+export type LoginRequestBody = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    /**
+     * Password
+     */
+    password: string;
+    /**
+     * Username
+     */
+    username: string;
+};
+
 export type PostDownloadRequest = {
     /**
      * A URL to the JSON Schema for this object.
@@ -90,6 +112,17 @@ export type SortDownloadsResponseBody = {
     readonly $schema?: string;
     files_with_errors: Array<string> | null;
     moved_files: Array<string> | null;
+};
+
+export type AuthStatusBodyWritable = {
+    authenticated: boolean;
+    username?: string;
+};
+
+export type AuthSuccessBodyWritable = {
+    message: string;
+    success: boolean;
+    username: string;
 };
 
 export type DownloadResponseBodyWritable = {
@@ -124,6 +157,17 @@ export type ErrorModelWritable = {
     type?: string;
 };
 
+export type LoginRequestBodyWritable = {
+    /**
+     * Password
+     */
+    password: string;
+    /**
+     * Username
+     */
+    username: string;
+};
+
 export type PostDownloadRequestWritable = {
     url: string;
     /**
@@ -136,6 +180,81 @@ export type SortDownloadsResponseBodyWritable = {
     files_with_errors: Array<string> | null;
     moved_files: Array<string> | null;
 };
+
+export type PostApiV1AuthLoginData = {
+    body: LoginRequestBodyWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/login';
+};
+
+export type PostApiV1AuthLoginErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type PostApiV1AuthLoginError = PostApiV1AuthLoginErrors[keyof PostApiV1AuthLoginErrors];
+
+export type PostApiV1AuthLoginResponses = {
+    /**
+     * OK
+     */
+    200: AuthSuccessBody;
+};
+
+export type PostApiV1AuthLoginResponse = PostApiV1AuthLoginResponses[keyof PostApiV1AuthLoginResponses];
+
+export type PostApiV1AuthLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/logout';
+};
+
+export type PostApiV1AuthLogoutErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type PostApiV1AuthLogoutError = PostApiV1AuthLogoutErrors[keyof PostApiV1AuthLogoutErrors];
+
+export type PostApiV1AuthLogoutResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiV1AuthLogoutResponse = PostApiV1AuthLogoutResponses[keyof PostApiV1AuthLogoutResponses];
+
+export type GetApiV1AuthStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/status';
+};
+
+export type GetApiV1AuthStatusErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type GetApiV1AuthStatusError = GetApiV1AuthStatusErrors[keyof GetApiV1AuthStatusErrors];
+
+export type GetApiV1AuthStatusResponses = {
+    /**
+     * OK
+     */
+    200: AuthStatusBody;
+};
+
+export type GetApiV1AuthStatusResponse = GetApiV1AuthStatusResponses[keyof GetApiV1AuthStatusResponses];
 
 export type PostApiV1DownloadData = {
     body: PostDownloadRequestWritable;
@@ -161,76 +280,6 @@ export type PostApiV1DownloadResponses = {
 };
 
 export type PostApiV1DownloadResponse = PostApiV1DownloadResponses[keyof PostApiV1DownloadResponses];
-
-export type DownloadStreamData = {
-    body?: never;
-    path: {
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/v1/download/stream/{task_id}';
-};
-
-export type DownloadStreamErrors = {
-    /**
-     * Error
-     */
-    default: ErrorModel;
-};
-
-export type DownloadStreamError = DownloadStreamErrors[keyof DownloadStreamErrors];
-
-export type DownloadStreamResponses = {
-    /**
-     * Server Sent Events
-     * Each oneOf object in the array represents one possible Server Sent Events (SSE) message, serialized as UTF-8 text according to the SSE specification.
-     */
-    200: Array<{
-        data: DownloadNotFoundEvent;
-        /**
-         * The event name.
-         */
-        event: 'download_not_found';
-        /**
-         * The event ID.
-         */
-        id?: number;
-        /**
-         * The retry time in milliseconds.
-         */
-        retry?: number;
-    } | {
-        data: DownloadSuccessEvent;
-        /**
-         * The event name.
-         */
-        event: 'download_success';
-        /**
-         * The event ID.
-         */
-        id?: number;
-        /**
-         * The retry time in milliseconds.
-         */
-        retry?: number;
-    } | {
-        data: DownloadStdoutNewLineEvent;
-        /**
-         * The event name.
-         */
-        event: 'new_line';
-        /**
-         * The event ID.
-         */
-        id?: number;
-        /**
-         * The retry time in milliseconds.
-         */
-        retry?: number;
-    }>;
-};
-
-export type DownloadStreamResponse = DownloadStreamResponses[keyof DownloadStreamResponses];
 
 export type PostApiV1SortDownloadsData = {
     body?: never;

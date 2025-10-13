@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/nicolassutter/scyd/utils"
@@ -20,8 +21,9 @@ type Session struct {
 
 // Response body structs
 type AuthSuccessBody struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success  bool   `json:"success"`
+	Message  string `json:"message"`
+	Username string `json:"username"`
 }
 
 type AuthStatusBody struct {
@@ -39,6 +41,7 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
+	Status    int
 	SetCookie http.Cookie `header:"Set-Cookie"`
 	Body      AuthSuccessBody
 }
@@ -71,13 +74,9 @@ func verifyPassword(password, hash string) bool {
 func LoginHandler(ctx context.Context, input *LoginRequest) (*LoginResponse, error) {
 	// Check if user exists and password is correct
 	user, exists := utils.UserConfig.Users[input.Body.Username]
+
 	if !exists || !verifyPassword(input.Body.Password, user.PasswordHash) {
-		return &LoginResponse{
-			Body: AuthSuccessBody{
-				Success: false,
-				Message: "Invalid username or password",
-			},
-		}, nil
+		return nil, huma.Error401Unauthorized("Invalid username or password")
 	}
 
 	c := utils.GetFiberCtx(ctx)
@@ -97,8 +96,9 @@ func LoginHandler(ctx context.Context, input *LoginRequest) (*LoginResponse, err
 
 	return &LoginResponse{
 		Body: AuthSuccessBody{
-			Success: true,
-			Message: "Login successful",
+			Success:  true,
+			Message:  "Login successful",
+			Username: input.Body.Username,
 		},
 	}, nil
 }
@@ -114,7 +114,7 @@ func LogoutHandler(ctx context.Context, input *LogoutRequest) (*struct{}, error)
 	return nil, nil
 }
 
-func isAuthenticated(c *fiber.Ctx) bool {
+func isAuthenticated(c *fiber.Ctx) (*session.Session, bool) {
 	// .Get creates a new session if one does not exist
 	s, err := store.Get(c)
 
@@ -123,26 +123,36 @@ func isAuthenticated(c *fiber.Ctx) bool {
 		if s.Fresh() {
 			s.Destroy()
 		}
-		return false
+		return s, false
 	}
 
-	return true
+	return s, true
 }
 
 // AuthStatusHandler returns the current authentication status (Huma handler)
 func AuthStatusHandler(ctx context.Context, input *AuthStatusRequest) (*AuthStatusResponse, error) {
 	c := utils.GetFiberCtx(ctx)
+	session, authenticated := isAuthenticated(c)
+
+	username := ""
+
+	if authenticated {
+		username = session.Get("username").(string)
+	}
 
 	return &AuthStatusResponse{
 		Body: AuthStatusBody{
-			Authenticated: isAuthenticated(c),
+			Authenticated: authenticated,
+			Username:      username,
 		},
 	}, nil
 }
 
 func AuthMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		if !isAuthenticated(c) {
+		_, authenticated := isAuthenticated(c)
+
+		if !authenticated {
 			return c.Status(401).JSON(fiber.Map{
 				"error": "Invalid or expired session",
 			})

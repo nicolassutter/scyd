@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DownloadStreamData, DownloadStreamErrors, DownloadStreamResponses, GetApiV1StatusData, GetApiV1StatusErrors, GetApiV1StatusResponses, PostApiV1DownloadData, PostApiV1DownloadErrors, PostApiV1DownloadResponses, PostApiV1SortDownloadsData, PostApiV1SortDownloadsErrors, PostApiV1SortDownloadsResponses } from './types.gen';
+import type { GetApiV1AuthStatusData, GetApiV1AuthStatusErrors, GetApiV1AuthStatusResponses, GetApiV1StatusData, GetApiV1StatusErrors, GetApiV1StatusResponses, PostApiV1AuthLoginData, PostApiV1AuthLoginErrors, PostApiV1AuthLoginResponses, PostApiV1AuthLogoutData, PostApiV1AuthLogoutErrors, PostApiV1AuthLogoutResponses, PostApiV1DownloadData, PostApiV1DownloadErrors, PostApiV1DownloadResponses, PostApiV1SortDownloadsData, PostApiV1SortDownloadsErrors, PostApiV1SortDownloadsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -19,6 +19,40 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * Post API v1 auth login
+ */
+export const postApiV1AuthLogin = <ThrowOnError extends boolean = false>(options: Options<PostApiV1AuthLoginData, ThrowOnError>) => {
+    return (options.client ?? client).post<PostApiV1AuthLoginResponses, PostApiV1AuthLoginErrors, ThrowOnError>({
+        url: '/api/v1/auth/login',
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
+    });
+};
+
+/**
+ * Post API v1 auth logout
+ */
+export const postApiV1AuthLogout = <ThrowOnError extends boolean = false>(options?: Options<PostApiV1AuthLogoutData, ThrowOnError>) => {
+    return (options?.client ?? client).post<PostApiV1AuthLogoutResponses, PostApiV1AuthLogoutErrors, ThrowOnError>({
+        url: '/api/v1/auth/logout',
+        ...options
+    });
+};
+
+/**
+ * Get API v1 auth status
+ */
+export const getApiV1AuthStatus = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1AuthStatusData, ThrowOnError>) => {
+    return (options?.client ?? client).get<GetApiV1AuthStatusResponses, GetApiV1AuthStatusErrors, ThrowOnError>({
+        url: '/api/v1/auth/status',
+        ...options
+    });
+};
+
+/**
  * Post API v1 download
  */
 export const postApiV1Download = <ThrowOnError extends boolean = false>(options: Options<PostApiV1DownloadData, ThrowOnError>) => {
@@ -29,13 +63,6 @@ export const postApiV1Download = <ThrowOnError extends boolean = false>(options:
             'Content-Type': 'application/json',
             ...options.headers
         }
-    });
-};
-
-export const downloadStream = <ThrowOnError extends boolean = false>(options: Options<DownloadStreamData, ThrowOnError>) => {
-    return (options.client ?? client).sse.get<DownloadStreamResponses, DownloadStreamErrors, ThrowOnError>({
-        url: '/api/v1/download/stream/{task_id}',
-        ...options
     });
 };
 
