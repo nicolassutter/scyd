@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humafiber"
@@ -52,8 +53,12 @@ func main() {
 	// Apply auth middleware to the Huma API routes by using Fiber middleware
 	// Huma is protected as well because it's mounted on the Fiber app
 	protectedAPI := fiberApp.Group("/api/v1", handlers.AuthMiddleware())
+
+	// Download routes (protected)
 	huma.Post(api_v1, "/download", handlers.DownloadHandler)
 	huma.Post(api_v1, "/sort-downloads", handlers.SortDownloadsHandler)
+	huma.Get(api_v1, "/downloads", handlers.GetDownloadsHandler)
+
 	// Use a raw Fiber handler for SSE to avoid flushing issues
 	protectedAPI.Get("/download/stream/:task_id", handlers.RawDownloadStreamHandler)
 
@@ -70,6 +75,12 @@ func main() {
 			c.Set("Content-Type", "application/manifest+json")
 			return nil
 		})
+	}
+
+	// Initialize database
+	err := utils.InitDatabase()
+	if err != nil {
+		log.Fatalf("Error initializing database: %s", err)
 	}
 
 	fiberApp.Listen(":3000")
