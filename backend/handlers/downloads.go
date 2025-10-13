@@ -42,18 +42,21 @@ func startDownloadTask(taskId string, outputCh chan string, cmd *exec.Cmd) huma.
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Failed to get command stdout:", err.Error())
+		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
 		return huma.Error500InternalServerError("Failed to get command stdout: " + err.Error())
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		fmt.Println("Failed to get command stderr:", err.Error())
+		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
 		return huma.Error500InternalServerError("Failed to get command stderr: " + err.Error())
 	}
 
 	// Start the command
 	if err := cmd.Start(); err != nil {
 		fmt.Println("Failed to start command:", err.Error())
+		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
 		return huma.Error500InternalServerError("Failed to start command: " + err.Error())
 	}
 
@@ -96,6 +99,7 @@ func startDownloadTask(taskId string, outputCh chan string, cmd *exec.Cmd) huma.
 		_, err := SortDownloadsDirectory()
 
 		if err != nil {
+			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
 			fmt.Println("Failed to sort downloads after download:", err.Error())
 		}
 	}
@@ -153,6 +157,7 @@ func RawDownloadStreamHandler(c *fiber.Ctx) error {
 
 		// Send completion event, empty data
 		fmt.Fprintf(w, "event: download_success\ndata: %s\n\n", "{}")
+		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnDownloadComplete)
 		w.Flush()
 	})
 
@@ -183,7 +188,11 @@ func DownloadHandler(ctx context.Context, input *struct {
 		additionalArgs, err := shlex.Split(input.Body.YtDlpArgs)
 
 		if err != nil {
-			return nil, huma.Error400BadRequest(("Failed to parse yt-dlp args: " + err.Error()))
+			errorMessage := fmt.Sprintf(
+				"Failed to parse additional yt-dlp args '%s': %s\n", input.Body.YtDlpArgs, err.Error(),
+			)
+			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
+			return nil, huma.Error400BadRequest(errorMessage)
 		}
 
 		devDockerPrefix := []string{

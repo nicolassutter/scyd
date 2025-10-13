@@ -12,6 +12,12 @@ type User struct {
 	PasswordHash string `yaml:"password_hash"`
 }
 
+// hook_name: command
+type Hooks struct {
+	OnError            string `yaml:"on_error"`
+	OnDownloadComplete string `yaml:"on_download_complete"`
+}
+
 type config struct {
 	DownloadDir string `yaml:"download_dir"`
 	OutputDir   string `yaml:"output_dir"`
@@ -19,6 +25,7 @@ type config struct {
 	SortAfterDownload bool `yaml:"sort_after_download"`
 	// Users for authentication
 	Users map[string]User `yaml:"users"`
+	Hooks Hooks           `yaml:"hooks"`
 }
 
 func newConfig() *config {
@@ -27,6 +34,7 @@ func newConfig() *config {
 		OutputDir:         "/output",
 		SortAfterDownload: true,
 		Users:             make(map[string]User),
+		Hooks:             Hooks{},
 	}
 	return config
 }
