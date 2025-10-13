@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Download } from "~/utils/client";
+import type { Download } from "../utils/client";
 
 const props = defineProps<Download>();
 
