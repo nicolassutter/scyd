@@ -6,3 +6,6 @@ install:
 
 dev:
 	bash -c 'cd backend && air' & bash -c 'cd frontend && bun run dev --port 3001'
+	
+build_local:
+	docker build -t scyd:latest .

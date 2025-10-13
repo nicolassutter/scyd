@@ -8,11 +8,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type User struct {
+	PasswordHash string `yaml:"password_hash"`
+}
+
 type config struct {
 	DownloadDir string `yaml:"download_dir"`
 	OutputDir   string `yaml:"output_dir"`
 	// Automatically sort downloads after each download completes
 	SortAfterDownload bool `yaml:"sort_after_download"`
+	// Users for authentication
+	Users map[string]User `yaml:"users"`
 }
 
 func newConfig() *config {
@@ -20,6 +26,7 @@ func newConfig() *config {
 		DownloadDir:       "/downloads",
 		OutputDir:         "/output",
 		SortAfterDownload: true,
+		Users:             make(map[string]User),
 	}
 	return config
 }

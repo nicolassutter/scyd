@@ -1,5 +1,5 @@
 # Multi-stage build optimized for GitHub Actions
-FROM python:3-trixie AS runtime-base
+FROM python:3.14.0 AS runtime-base
 WORKDIR /app
 # Install system dependencies first (they change less frequently)
 RUN apt-get update && apt-get install -y --no-install-recommends \

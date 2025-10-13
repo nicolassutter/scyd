@@ -15,6 +15,9 @@ func main() {
 	// sets up the user config before anything else
 	utils.ReadUserConfigFile()
 
+	// Start session cleanup for authentication
+	handlers.StartSessionCleanup()
+
 	fiberApp := fiber.New()
 
 	if utils.IsDevelopment() {
@@ -28,11 +31,12 @@ func main() {
 
 	api_v1 := huma.NewGroup(api, "/api/v1")
 
-	huma.Post(api_v1, "/download", handlers.DownloadHandler)
-	// Use a raw Fiber handler for SSE to avoid flushing issues
-	fiberApp.Get("/api/v1/download/stream/:task_id", handlers.RawDownloadStreamHandler)
-	huma.Post(api_v1, "/sort-downloads", handlers.SortDownloadsHandler)
+	// Auth routes (public) - now using Huma
+	huma.Post(api_v1, "/auth/login", handlers.LoginHandler)
+	huma.Post(api_v1, "/auth/logout", handlers.LogoutHandler)
+	huma.Get(api_v1, "/auth/status", handlers.AuthStatusHandler)
 
+	// health check route
 	type statusResponse struct {
 		Body *fiber.Map
 	}
@@ -43,6 +47,15 @@ func main() {
 			},
 		}, nil
 	})
+
+	// Protected routes (require authentication)
+	// Apply auth middleware to the Huma API routes by using Fiber middleware
+	// Huma is protected as well because it's mounted on the Fiber app
+	protectedAPI := fiberApp.Group("/api/v1", handlers.AuthMiddleware())
+	huma.Post(api_v1, "/download", handlers.DownloadHandler)
+	huma.Post(api_v1, "/sort-downloads", handlers.SortDownloadsHandler)
+	// Use a raw Fiber handler for SSE to avoid flushing issues
+	protectedAPI.Get("/download/stream/:task_id", handlers.RawDownloadStreamHandler)
 
 	if !utils.IsDevelopment() {
 		fiberApp.Static("/", "./public")
