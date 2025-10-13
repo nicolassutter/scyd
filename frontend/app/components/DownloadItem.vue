@@ -83,10 +83,7 @@ watch(
 </script>
 
 <template>
-  <UCard
-    variant="subtle"
-    class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl hover:border-slate-600/50 transition-colors"
-  >
+  <UCard variant="subtle">
     <template #header>
       <div class="flex items-start gap-4">
         <div
@@ -95,6 +92,7 @@ watch(
         >
           <img :src="thumbnailUrl" alt="" class="w-full h-full object-cover" />
         </div>
+
         <div
           v-else
           class="w-16 h-16 rounded-lg flex-shrink-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center"

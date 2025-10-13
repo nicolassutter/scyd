@@ -65,41 +65,38 @@ async function handleSubmit(event: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto text-center space-y-8">
-    <h1 class="text-5xl md:text-7xl font-bold text-white leading-tight">
-      Self-hosted
-      <span
-        class="block bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent"
-        >Music Downloader
-      </span>
-    </h1>
+  <UPageHero
+    title="Scyd - Self-hosted music downloader"
+    description="Keep your favorite songs from a variety of platforms with just a single
+      click. No account required, completely free and open-source."
+    :links="[]"
+  />
 
-    <p class="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-      Keep your favorite songs from a variety of platforms with just a single
-      click. No account required, completely free and open-source.
-    </p>
-
-    <UForm :schema="schema" :state="state" @submit="handleSubmit">
-      <div
-        class="flex items-center gap-3 p-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full shadow-2xl"
-      >
-        <UFormField name="url" class="w-full max-w-xl">
-          <input
-            v-model="state.url"
-            aria-label="Url"
-            type="text"
-            placeholder="https://youtube.com/never-gonna-give-u-up"
-            class="flex-1 w-full px-6 py-4 bg-transparent text-white placeholder:text-slate-500 outline-none text-lg"
-            aria-required="true"
-          />
-        </UFormField>
-        <button
-          type="submit"
-          class="shrink-0 cursor-pointer flex items-center justify-center w-14 h-14 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/25"
-        >
-          <UIcon name="i-lucide:download" size="20" />
-        </button>
-      </div>
-    </UForm>
-  </div>
+  <UForm
+    class="w-full max-w-xl mx-auto"
+    :schema="schema"
+    :state="state"
+    @submit="handleSubmit"
+  >
+    <div
+      class="flex items-center gap-3 py-2 px-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full shadow-2xl"
+    >
+      <UFormField name="url" class="w-full">
+        <input
+          v-model="state.url"
+          aria-label="Url"
+          type="text"
+          placeholder="https://youtube.com/never-gonna-give-u-up"
+          class="flex-1 w-full py-4 bg-transparent text-white placeholder:text-slate-500 outline-none text-lg"
+          aria-required="true"
+        />
+      </UFormField>
+      <UButton
+        type="submit"
+        icon="i-lucide:download"
+        size="xl"
+        class="rounded-full"
+      />
+    </div>
+  </UForm>
 </template>
