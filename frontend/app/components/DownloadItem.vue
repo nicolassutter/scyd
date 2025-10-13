@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { useWebSocket } from "@vueuse/core";
 import z from "zod";
 import type { Download } from "~/utils/client";
-import { client } from "~/utils/client/client.gen";
 
 const props = defineProps<Download>();
 
@@ -27,45 +25,22 @@ const logsScroller = useTemplateRef<HTMLElement>("logsScroller");
 
 const logs = ref<string[]>([]);
 
-const apiBaseUrl = client.getConfig().baseUrl ?? "";
-const apiHost = apiBaseUrl ? new URL(apiBaseUrl).host : window.location.host;
-const { data, close } = useWebSocket(`ws://${apiHost}/api/v1/ws/download`);
-const msgSchema = z
-  .string()
-  .transform((input) => {
-    try {
-      return JSON.parse(input);
-    } catch {
-      return null;
-    }
-  })
-  .pipe(
-    z.object({
-      event: z.enum(["progress", "success", "error", "start"]),
-      download_id: z.int(),
-      data: z.string(),
-    })
-  );
+const { websocketEmitter } = useDownloads();
 
-watch(data, (incomingMessage) => {
-  if (incomingMessage) {
-    try {
-      const msg = msgSchema.parse(incomingMessage);
+const websocketEventName = `download-${props.id}` as `download-${number}`;
 
-      if (msg.event === "progress") {
-        logs.value.push(msg.data);
-      } else if (msg.event === "success") {
-        logs.value.push("✅ Download completed successfully.");
-        close();
-      }
-    } catch (error) {
-      console.error(
-        "Failed to parse WebSocket message:",
-        incomingMessage,
-        error
-      );
-    }
+// Listen for websocket events specific to this download item
+websocketEmitter.on(websocketEventName, (incomingMessage) => {
+  if (incomingMessage.event === "progress") {
+    logs.value.push(incomingMessage.data);
+  } else if (incomingMessage.event === "success") {
+    logs.value.push("✅ Download completed successfully.");
+    close();
   }
+});
+
+onBeforeUnmount(() => {
+  websocketEmitter.off(websocketEventName);
 });
 
 watch(

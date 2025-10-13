@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import type { Download } from "~/utils/client";
-
-defineProps<{
-  downloads: Download[];
-}>();
+const { downloadsQuery } = useDownloads();
+const downloads = computed(() => downloadsQuery.data.value ?? []);
 </script>
 
 <template>

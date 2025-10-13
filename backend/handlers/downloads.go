@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -37,6 +38,9 @@ func broadcastDownloadMessage(msg DownloadMessage) {
 		return
 	}
 
+	clientsMutex.RLock()
+	defer clientsMutex.RUnlock()
+
 	for _, client := range clients {
 		if client != nil {
 			client.Emit(msgBytes)
@@ -61,11 +65,14 @@ type DownloadMessage struct {
 
 // key: connection uuid
 var clients = make(map[string]*socketio.Websocket)
+var clientsMutex sync.RWMutex
 
 // WebSocket handler for download connections
 func SetupDownloadWebSocket(router *fiber.Router) {
 	socketio.On(socketio.EventDisconnect, func(payload *socketio.EventPayload) {
+		clientsMutex.Lock()
 		delete(clients, payload.Kws.UUID)
+		clientsMutex.Unlock()
 	})
 
 	// require websocket upgrade to access this route
@@ -78,7 +85,9 @@ func SetupDownloadWebSocket(router *fiber.Router) {
 	})
 
 	(*router).Get("/ws/download", socketio.New(func(kws *socketio.Websocket) {
+		clientsMutex.Lock()
 		clients[kws.UUID] = kws
+		clientsMutex.Unlock()
 	}))
 }
 
