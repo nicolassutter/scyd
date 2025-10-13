@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/vue-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { createGlobalState, useWebSocket } from "@vueuse/core";
 import z from "zod";
-import { getApiV1Downloads } from "~/utils/client";
+import { getApiV1Downloads, type Download } from "~/utils/client";
 import { client } from "~/utils/client/client.gen";
 
 import mitt from "mitt";
@@ -23,6 +23,14 @@ const msgSchema = z
     })
   );
 
+export const downloadStateSchema = z.enum([
+  "pending",
+  "success",
+  "progress",
+  "error",
+]);
+export type DownloadState = z.infer<typeof downloadStateSchema>;
+
 const emitter = mitt<{
   [key: `download-${number}`]: z.infer<typeof msgSchema>;
 }>();
@@ -34,7 +42,7 @@ export const useDownloads = createGlobalState(() => {
     `ws://${apiHost}/api/v1/ws/download`
   );
 
-  const downloadsQuery = useQuery({
+  const downloadsQueryOptions = queryOptions({
     queryKey: ["downloads"],
     queryFn: async () => {
       const response = await getApiV1Downloads();
@@ -42,6 +50,7 @@ export const useDownloads = createGlobalState(() => {
       return downloads;
     },
   });
+  const downloadsQuery = useQuery(downloadsQueryOptions);
 
   const parsedWebsocketData = computed(
     () => msgSchema.safeParse(websocketData.value).data
@@ -54,10 +63,31 @@ export const useDownloads = createGlobalState(() => {
     }
   });
 
+  const queryClient = useQueryClient();
+
+  /**
+   * Update a download item in the local cache only
+   */
+  function updateDownloadItemLocal(
+    id: number,
+    update: Partial<Download> & {
+      state?: DownloadState;
+    }
+  ) {
+    queryClient.setQueryData(downloadsQueryOptions.queryKey, (old) => {
+      if (!old) return old;
+
+      return old.map((item) =>
+        item.id === id ? { ...item, ...update } : item
+      );
+    });
+  }
+
   return {
     close,
     downloadsQuery,
     parsedWebsocketData,
     websocketEmitter: emitter,
+    updateDownloadItemLocal,
   };
 });

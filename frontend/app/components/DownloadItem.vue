@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import z from "zod";
 import type { Download } from "~/utils/client";
 
 const props = defineProps<Download>();
@@ -25,7 +24,7 @@ const logsScroller = useTemplateRef<HTMLElement>("logsScroller");
 
 const logs = ref<string[]>([]);
 
-const { websocketEmitter } = useDownloads();
+const { websocketEmitter, updateDownloadItemLocal } = useDownloads();
 
 const websocketEventName = `download-${props.id}` as `download-${number}`;
 
@@ -35,6 +34,9 @@ websocketEmitter.on(websocketEventName, (incomingMessage) => {
     logs.value.push(incomingMessage.data);
   } else if (incomingMessage.event === "success") {
     logs.value.push("✅ Download completed successfully.");
+    updateDownloadItemLocal(props.id, {
+      state: "success" satisfies DownloadState,
+    });
     close();
   }
 });
@@ -58,9 +60,7 @@ watch(
 );
 
 const downloadState = computed(
-  () =>
-    z.enum(["success", "pending", "progress", "error"]).safeParse(props.state)
-      .data
+  () => downloadStateSchema.safeParse(props.state).data
 );
 </script>
 
