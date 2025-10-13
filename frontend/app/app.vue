@@ -5,6 +5,7 @@ import { client } from "./utils/client/client.gen";
 client.setConfig({
   baseUrl: import.meta.env.DEV ? "http://localhost:3000" : undefined,
   throwOnError: true,
+  credentials: import.meta.env.DEV ? "include" : "same-origin",
 });
 
 useHead({

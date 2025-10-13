@@ -1,9 +1,8 @@
 <script setup lang="ts">
+import type { Download } from "~/utils/client";
+
 defineProps<{
-  downloads: {
-    id: string;
-    url: string;
-  }[];
+  downloads: Download[];
 }>();
 </script>
 
@@ -14,7 +13,7 @@ defineProps<{
 
       <div v-if="downloads.length" class="grid md:grid-cols-2 gap-6">
         <template v-for="download in downloads" :key="download.id">
-          <DownloadItem :id="download.id" :url="download.url" />
+          <DownloadItem v-bind="download" />
         </template>
       </div>
 

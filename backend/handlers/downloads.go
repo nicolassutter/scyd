@@ -3,18 +3,18 @@ package handlers
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
-
-	"encoding/json"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/gofiber/contrib/socketio"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/shlex"
-	"github.com/google/uuid"
 	"github.com/nicolassutter/scyd/models"
 	"github.com/nicolassutter/scyd/services"
 	"github.com/nicolassutter/scyd/utils"
@@ -23,45 +23,113 @@ import (
 type DownloadResponse struct {
 	Body DownloadResponseBody
 }
+
 type DownloadResponseBody struct {
 	Message    string `json:"message"`
-	TaskID     string `json:"task_id"`
 	DownloadID uint   `json:"download_id"`
 }
 
-type TaskInfo struct {
-	Channel    chan string // channel to stream command output
-	DownloadID uint
-	URL        string
+func broadcastDownloadMessage(msg DownloadMessage) {
+	msgBytes, err := json.Marshal(msg)
+
+	if err != nil {
+		fmt.Println("Failed to marshal download message:", err)
+		return
+	}
+
+	for _, client := range clients {
+		if client != nil {
+			client.Emit(msgBytes)
+		}
+	}
 }
 
-var taskStatus = make(map[string]*TaskInfo) // map[TaskID] -> TaskInfo with Channel, DownloadID, and URL
-var mu sync.Mutex                           // Mutex to safely access the map
+type DownloadEvent string
 
-func startDownloadTask(taskId string, taskInfo *TaskInfo, cmd *exec.Cmd) huma.StatusError {
-	outputCh := taskInfo.Channel
+const (
+	DownloadEventStart    DownloadEvent = "start"
+	DownloadEventProgress DownloadEvent = "progress"
+	DownloadEventError    DownloadEvent = "error"
+	DownloadEventSuccess  DownloadEvent = "success"
+)
+
+type DownloadMessage struct {
+	Event      DownloadEvent `json:"event"`
+	DownloadID uint          `json:"download_id"`
+	Data       string        `json:"data"`
+}
+
+// key: connection uuid
+var clients = make(map[string]*socketio.Websocket)
+
+// WebSocket handler for download connections
+func SetupDownloadWebSocket(router *fiber.Router) {
+	socketio.On(socketio.EventDisconnect, func(payload *socketio.EventPayload) {
+		delete(clients, payload.Kws.UUID)
+	})
+
+	// require websocket upgrade to access this route
+	(*router).Use("/ws/download", func(c *fiber.Ctx) error {
+		if websocket.IsWebSocketUpgrade(c) {
+			c.Locals("allowed", true)
+			return c.Next()
+		}
+		return fiber.ErrUpgradeRequired
+	})
+
+	(*router).Get("/ws/download", socketio.New(func(kws *socketio.Websocket) {
+		clients[kws.UUID] = kws
+	}))
+}
+
+func startDownloadTaskWS(downloadID uint, cmd *exec.Cmd) {
 	downloadService := services.NewDownloadService()
-
 	var errorMessage string
 
 	defer func() {
 		// Update download state based on command result
 		if cmd.ProcessState != nil && cmd.ProcessState.Success() {
-			downloadService.UpdateDownloadState(taskInfo.DownloadID, models.DownloadStateSuccess, "")
+			downloadService.UpdateDownloadState(downloadID, models.DownloadStateSuccess, "")
 			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnDownloadComplete)
+			// Broadcast success message
+			broadcastDownloadMessage(DownloadMessage{
+				Event:      DownloadEventSuccess,
+				DownloadID: downloadID,
+				Data:       "Download completed successfully",
+			})
 		} else {
 			if errorMessage == "" {
 				errorMessage = "Download failed"
 			}
-			downloadService.UpdateDownloadState(taskInfo.DownloadID, models.DownloadStateError, errorMessage)
+			downloadService.UpdateDownloadState(downloadID, models.DownloadStateError, errorMessage)
 			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
+
+			// Broadcast error message
+			broadcastDownloadMessage(DownloadMessage{
+				Event:      DownloadEventError,
+				DownloadID: downloadID,
+				Data:       "Download failed",
+			})
 		}
 
-		// Clean up the map and close the channel when done
-		mu.Lock()
-		delete(taskStatus, taskId)
-		close(outputCh)
-		mu.Unlock()
+		// Post-process: sort downloads if configured
+		if utils.UserConfig.SortAfterDownload {
+			fmt.Printf("Sorting downloads directory %s\n", utils.UserConfig.DownloadDir)
+			_, err := SortDownloadsDirectory()
+			if err != nil {
+				utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
+				fmt.Println("Failed to sort downloads after download:", err.Error())
+			}
+		}
+
+		// Delete cover.jpg if one has been downloaded
+		coverPath := utils.UserConfig.DownloadDir + "/cover.jpg"
+		if _, err := os.Stat(coverPath); err == nil {
+			err := os.Remove(coverPath)
+			if err != nil {
+				fmt.Printf("Failed to delete cover.jpg: %s\n", err.Error())
+			}
+		}
 	}()
 
 	// Create pipes to capture both stdout and stderr
@@ -69,45 +137,56 @@ func startDownloadTask(taskId string, taskInfo *TaskInfo, cmd *exec.Cmd) huma.St
 	if err != nil {
 		errorMessage = "Failed to get command stdout: " + err.Error()
 		fmt.Println(errorMessage)
-		downloadService.UpdateDownloadState(taskInfo.DownloadID, models.DownloadStateError, errorMessage)
+		downloadService.UpdateDownloadState(downloadID, models.DownloadStateError, errorMessage)
 		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
-		return huma.Error500InternalServerError(errorMessage)
+		return
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		errorMessage = "Failed to get command stderr: " + err.Error()
 		fmt.Println(errorMessage)
-		downloadService.UpdateDownloadState(taskInfo.DownloadID, models.DownloadStateError, errorMessage)
+		downloadService.UpdateDownloadState(downloadID, models.DownloadStateError, errorMessage)
 		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
-		return huma.Error500InternalServerError(errorMessage)
+		return
 	}
 
 	// Start the command
 	if err := cmd.Start(); err != nil {
-		errorMessage = "Failed to start command: " + err.Error()
+		errorMessage = "Failed to start download command: " + err.Error()
 		fmt.Println(errorMessage)
-		downloadService.UpdateDownloadState(taskInfo.DownloadID, models.DownloadStateError, errorMessage)
+		downloadService.UpdateDownloadState(downloadID, models.DownloadStateError, errorMessage)
 		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
-		return huma.Error500InternalServerError(errorMessage)
+		return
 	}
 
-	// 3. Read and Stream both stdout and stderr
-	// Use goroutines to read both streams concurrently
+	// Update download state to progress
+	downloadService.UpdateDownloadState(downloadID, models.DownloadStateProgress, "")
+
+	// Broadcast start message
+	broadcastDownloadMessage(DownloadMessage{
+		Event:      DownloadEventStart,
+		DownloadID: downloadID,
+		Data:       "Download started",
+	})
+
+	// Read stdout in a goroutine and send updates to WebSocket clients
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
 			line := scanner.Text()
 			fmt.Printf("STDOUT: %s\n", line)
 
-			select {
-			case outputCh <- line:
-			case <-context.Background().Done():
-				return
-			}
+			// Broadcast progress update
+			broadcastDownloadMessage(DownloadMessage{
+				Event:      DownloadEventProgress,
+				DownloadID: downloadID,
+				Data:       line,
+			})
 		}
 	}()
 
+	// Read stderr in another goroutine and capture errors
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
@@ -121,88 +200,20 @@ func startDownloadTask(taskId string, taskInfo *TaskInfo, cmd *exec.Cmd) huma.St
 				errorMessage = line
 			}
 
-			select {
-			case outputCh <- line:
-			case <-context.Background().Done():
-				return
-			}
+			// Broadcast error output
+			broadcastDownloadMessage(DownloadMessage{
+				Event:      DownloadEventError,
+				DownloadID: downloadID,
+				Data:       line,
+			})
 		}
 	}()
 
-	// Wait for the command to finish and close the connection
+	// Wait for the command to finish
 	cmd.Wait()
-
-	if utils.UserConfig.SortAfterDownload {
-		fmt.Printf("Sorting downloads directory %s\n", utils.UserConfig.DownloadDir)
-
-		_, err := SortDownloadsDirectory()
-
-		if err != nil {
-			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
-			fmt.Println("Failed to sort downloads after download:", err.Error())
-		}
-	}
-
-	// delete cover.jpg if one has been downloaded
-	coverPath := utils.UserConfig.DownloadDir + "/cover.jpg"
-	if _, err := os.Stat(coverPath); err == nil {
-		err := os.Remove(coverPath)
-
-		if err != nil {
-			println("Failed to delete cover.jpg:", err.Error())
-		}
-	}
-
-	return nil
 }
 
-type DownloadStdoutNewLineEvent struct {
-	Line string `json:"line" example:"[download] Downloading video 1 of 1"`
-}
-
-// RawDownloadStreamHandler handles SSE using raw Fiber without Huma's SSE wrapper
-func RawDownloadStreamHandler(c *fiber.Ctx) error {
-	taskID := c.Params("task_id")
-
-	// Set SSE headers
-	c.Set("Content-Type", "text/event-stream")
-	c.Set("Cache-Control", "no-cache")
-	c.Set("Connection", "keep-alive")
-
-	mu.Lock()
-	taskInfo, exists := taskStatus[taskID]
-	mu.Unlock()
-
-	if !exists {
-		// Send not found event, empty data
-		c.WriteString(fmt.Sprintf("event: download_not_found\ndata: %s\n\n", "{}"))
-		return nil
-	}
-
-	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		for line := range taskInfo.Channel {
-			event := DownloadStdoutNewLineEvent{Line: line}
-			data, _ := json.Marshal(event)
-
-			// Write SSE format
-			fmt.Fprintf(w, "event: new_line\ndata: %s\n\n", string(data))
-
-			// Flush the writer
-			err := w.Flush()
-			if err != nil {
-				fmt.Printf("SSE flush error (continuing): %v\n", err)
-			}
-		}
-
-		// Send completion event, empty data
-		fmt.Fprintf(w, "event: download_success\ndata: %s\n\n", "{}")
-		utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnDownloadComplete)
-		w.Flush()
-	})
-
-	return nil
-}
-
+// DownloadHandler handles download requests with WebSocket streaming
 func DownloadHandler(ctx context.Context, input *struct {
 	Body struct {
 		Url       string `required:"true" json:"url"`
@@ -213,40 +224,24 @@ func DownloadHandler(ctx context.Context, input *struct {
 	downloadService := services.NewDownloadService()
 	download, err := downloadService.CreateDownload(input.Body.Url)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to create download record: " + err.Error())
+		return nil, huma.Error500InternalServerError("Failed to create download record")
 	}
 
-	// 2. Generate a unique Task ID
-	taskId := uuid.New().String()
-
-	// 3. Create a channel for this task's output and TaskInfo
-	taskChannel := make(chan string)
-	taskInfo := &TaskInfo{
-		Channel:    taskChannel,
-		DownloadID: download.ID,
-		URL:        input.Body.Url,
-	}
-	mu.Lock()
-	taskStatus[taskId] = taskInfo
-	mu.Unlock()
-
-	// 4. Update download state to in-progress
-	downloadService.UpdateDownloadState(download.ID, models.DownloadStateProgress, "")
-
-	isDevelopment := utils.IsDevelopment()
 	isYoutube := strings.Contains(input.Body.Url, "youtube.com") || strings.Contains(input.Body.Url, "youtu.be")
 
-	cmd := &exec.Cmd{}
+	var cmd *exec.Cmd
+
+	isDevelopment := utils.IsDevelopment()
 
 	if isYoutube {
-		additionalArgs, err := shlex.Split(input.Body.YtDlpArgs)
-
-		if err != nil {
-			errorMessage := fmt.Sprintf(
-				"Failed to parse additional yt-dlp args '%s': %s\n", input.Body.YtDlpArgs, err.Error(),
-			)
-			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
-			return nil, huma.Error400BadRequest(errorMessage)
+		additionalArgs := []string{}
+		if input.Body.YtDlpArgs != "" {
+			additionalArgs, err = shlex.Split(input.Body.YtDlpArgs)
+			if err != nil {
+				return nil, huma.Error400BadRequest(fmt.Sprintf(
+					"Failed to parse additional yt-dlp args '%s': %s\n", input.Body.YtDlpArgs, err.Error(),
+				))
+			}
 		}
 
 		devDockerPrefix := []string{
@@ -327,14 +322,13 @@ func DownloadHandler(ctx context.Context, input *struct {
 	}
 
 	// Start the download task in a separate goroutine so we don't block
-	go startDownloadTask(taskId, taskInfo, cmd)
+	go startDownloadTaskWS(download.ID, cmd)
 
 	fmt.Printf("Download started for: %s to %s\n", input.Body.Url, utils.UserConfig.DownloadDir)
 
 	return &DownloadResponse{
 		Body: DownloadResponseBody{
 			Message:    "Download started",
-			TaskID:     taskId,
 			DownloadID: download.ID,
 		},
 	}, nil

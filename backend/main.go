@@ -52,15 +52,15 @@ func main() {
 	// Protected routes (require authentication)
 	// Apply auth middleware to the Huma API routes by using Fiber middleware
 	// Huma is protected as well because it's mounted on the Fiber app
-	protectedAPI := fiberApp.Group("/api/v1", handlers.AuthMiddleware())
+	fiberApiV1 := fiberApp.Group("/api/v1", handlers.AuthMiddleware())
 
 	// Download routes (protected)
 	huma.Post(api_v1, "/download", handlers.DownloadHandler)
 	huma.Post(api_v1, "/sort-downloads", handlers.SortDownloadsHandler)
 	huma.Get(api_v1, "/downloads", handlers.GetDownloadsHandler)
 
-	// Use a raw Fiber handler for SSE to avoid flushing issues
-	protectedAPI.Get("/download/stream/:task_id", handlers.RawDownloadStreamHandler)
+	// Setup WebSocket for real-time download updates
+	handlers.SetupDownloadWebSocket(&fiberApiV1)
 
 	if !utils.IsDevelopment() {
 		fiberApp.Static("/", "./public")

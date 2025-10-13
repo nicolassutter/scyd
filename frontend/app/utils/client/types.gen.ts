@@ -23,13 +23,22 @@ export type AuthSuccessBody = {
     username: string;
 };
 
+export type Download = {
+    created_at: string;
+    error_message: string;
+    id: number;
+    state: string;
+    updated_at: string;
+    url: string;
+};
+
 export type DownloadResponseBody = {
     /**
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
+    download_id: number;
     message: string;
-    task_id: string;
 };
 
 export type ErrorDetail = {
@@ -76,6 +85,14 @@ export type ErrorModel = {
      * A URI reference to human-readable documentation for the error.
      */
     type?: string;
+};
+
+export type GetDownloadsResponseBody = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    downloads: Array<Download> | null;
 };
 
 export type LoginRequestBody = {
@@ -126,8 +143,8 @@ export type AuthSuccessBodyWritable = {
 };
 
 export type DownloadResponseBodyWritable = {
+    download_id: number;
     message: string;
-    task_id: string;
 };
 
 export type ErrorModelWritable = {
@@ -155,6 +172,10 @@ export type ErrorModelWritable = {
      * A URI reference to human-readable documentation for the error.
      */
     type?: string;
+};
+
+export type GetDownloadsResponseBodyWritable = {
+    downloads: Array<Download> | null;
 };
 
 export type LoginRequestBodyWritable = {
@@ -280,6 +301,31 @@ export type PostApiV1DownloadResponses = {
 };
 
 export type PostApiV1DownloadResponse = PostApiV1DownloadResponses[keyof PostApiV1DownloadResponses];
+
+export type GetApiV1DownloadsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/downloads';
+};
+
+export type GetApiV1DownloadsErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type GetApiV1DownloadsError = GetApiV1DownloadsErrors[keyof GetApiV1DownloadsErrors];
+
+export type GetApiV1DownloadsResponses = {
+    /**
+     * OK
+     */
+    200: GetDownloadsResponseBody;
+};
+
+export type GetApiV1DownloadsResponse = GetApiV1DownloadsResponses[keyof GetApiV1DownloadsResponses];
 
 export type PostApiV1SortDownloadsData = {
     body?: never;

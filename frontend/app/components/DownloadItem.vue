@@ -1,11 +1,10 @@
 <script setup lang="ts">
+import { useWebSocket } from "@vueuse/core";
 import z from "zod";
+import type { Download } from "~/utils/client";
 import { client } from "~/utils/client/client.gen";
 
-const props = defineProps<{
-  id: string;
-  url: string;
-}>();
+const props = defineProps<Download>();
 
 const thumbnailUrl = computed(() => {
   const isYoutube =
@@ -28,43 +27,45 @@ const logsScroller = useTemplateRef<HTMLElement>("logsScroller");
 
 const logs = ref<string[]>([]);
 
-const evtSource = new EventSource(
-  client.buildUrl({
-    baseUrl: client.getConfig().baseUrl,
-    url: `/api/v1/download/stream/${props.id}`,
+const apiBaseUrl = client.getConfig().baseUrl ?? "";
+const apiHost = apiBaseUrl ? new URL(apiBaseUrl).host : window.location.host;
+const { data, close } = useWebSocket(`ws://${apiHost}/api/v1/ws/download`);
+const msgSchema = z
+  .string()
+  .transform((input) => {
+    try {
+      return JSON.parse(input);
+    } catch {
+      return null;
+    }
   })
-);
+  .pipe(
+    z.object({
+      event: z.enum(["progress", "success", "error", "start"]),
+      download_id: z.int(),
+      data: z.string(),
+    })
+  );
 
-evtSource.addEventListener("new_line", (event) => {
-  try {
-    const data = z
-      .object({
-        line: z.string(),
-      })
-      .parse(JSON.parse(event.data));
+watch(data, (incomingMessage) => {
+  if (incomingMessage) {
+    try {
+      const msg = msgSchema.parse(incomingMessage);
 
-    logs.value.push(data.line);
-  } catch (error) {
-    console.error("Failed to parse new_line event data:", event.data, error);
+      if (msg.event === "progress") {
+        logs.value.push(msg.data);
+      } else if (msg.event === "success") {
+        logs.value.push("✅ Download completed successfully.");
+        close();
+      }
+    } catch (error) {
+      console.error(
+        "Failed to parse WebSocket message:",
+        incomingMessage,
+        error
+      );
+    }
   }
-});
-
-evtSource.addEventListener("download_success", () => {
-  evtSource.close();
-  logs.value.push("✅ Download completed successfully.");
-});
-
-evtSource.onerror = (_error) => {
-  evtSource.close();
-  console.log("EventSource connection closed due to error.");
-};
-
-evtSource.onopen = () => {
-  console.log("EventSource connection opened");
-};
-
-onBeforeUnmount(() => {
-  evtSource.close();
 });
 
 watch(
@@ -79,6 +80,12 @@ watch(
     });
   },
   { deep: true }
+);
+
+const downloadState = computed(
+  () =>
+    z.enum(["success", "pending", "progress", "error"]).safeParse(props.state)
+      .data
 );
 </script>
 
@@ -100,20 +107,21 @@ watch(
           <UIcon name="i-lucide:download" class="w-8 h-8 text-blue-400" />
         </div>
 
-        <h3 class="text-lg font-semibold text-white mb-1 truncate">
-          {{ props.url }}
-        </h3>
+        <div>
+          <h3 class="text-lg font-semibold text-white mb-1 truncate">
+            {{ props.url }}
+          </h3>
+
+          <p v-if="downloadState">State: {{ downloadState }}</p>
+        </div>
       </div>
     </template>
 
     <div
+      v-if="logs.length"
       ref="logsScroller"
       class="bg-slate-900/50 rounded-lg p-4 font-mono text-sm max-h-48 overflow-y-auto"
     >
-      <p v-if="!logs.length" class="text-slate-500 italic">
-        No logs to display.
-      </p>
-
       <div
         v-for="(log, index) in logs"
         :key="index"
@@ -121,6 +129,10 @@ watch(
       >
         {{ log }}
       </div>
+
+      <template v-if="downloadState === 'error' && props.error_message">
+        last error message: {{ props.error_message }}
+      </template>
     </div>
   </UCard>
 </template>

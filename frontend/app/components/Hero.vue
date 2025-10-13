@@ -4,6 +4,10 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 import { useMutation } from "@tanstack/vue-query";
 import { postApiV1Download } from "~/utils/client";
 
+const emit = defineEmits<{
+  "download-started": [];
+}>();
+
 const schema = z.object({
   url: z.url(),
 });
@@ -16,13 +20,6 @@ const state = reactive<Partial<Schema>>({
   url: undefined,
 });
 
-const downloadItems = defineModel<
-  {
-    id: string;
-    url: string;
-  }[]
->("items");
-
 const startDownloadMutation = useMutation({
   mutationFn: async (url: string) => {
     const response = await postApiV1Download({
@@ -31,11 +28,8 @@ const startDownloadMutation = useMutation({
 
     return response.data;
   },
-  onSuccess: (data, inputUrl) => {
-    downloadItems.value?.unshift({
-      id: data?.task_id ?? crypto.randomUUID(),
-      url: inputUrl,
-    });
+  onSuccess: () => {
+    emit("download-started");
     state.url = "";
   },
 });
