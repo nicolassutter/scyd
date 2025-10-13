@@ -15,9 +15,6 @@ func main() {
 	// sets up the user config before anything else
 	utils.ReadUserConfigFile()
 
-	// Start session cleanup for authentication
-	handlers.StartSessionCleanup()
-
 	fiberApp := fiber.New()
 
 	if utils.IsDevelopment() {
@@ -28,6 +25,9 @@ func main() {
 	}
 
 	api := humafiber.New(fiberApp, huma.DefaultConfig("scyd REST API", "1.0.0"))
+
+	// Register global middleware that allows to access the Fiber context from Huma handlers
+	api.UseMiddleware(utils.StoreFiberCtx)
 
 	api_v1 := huma.NewGroup(api, "/api/v1")
 
@@ -71,5 +71,6 @@ func main() {
 			return nil
 		})
 	}
+
 	fiberApp.Listen(":3000")
 }
