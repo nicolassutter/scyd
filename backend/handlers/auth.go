@@ -9,6 +9,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/gofiber/storage/sqlite3/v2"
 	"github.com/nicolassutter/scyd/utils"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,7 +32,25 @@ type AuthStatusBody struct {
 	Username      string `json:"username,omitempty"`
 }
 
-var store = session.New()
+func setupSessionStore() *session.Store {
+	var isDevelopment = utils.IsDevelopment()
+
+	storage := sqlite3.New(sqlite3.Config{
+		Database: "./scyd.db",
+		Table:    "auth_sessions",
+		Reset:    false,
+	})
+
+	var store = session.New(session.Config{
+		CookieSecure:   !isDevelopment,
+		CookieHTTPOnly: true,
+		Storage:        storage,
+	})
+
+	return store
+}
+
+var store = setupSessionStore()
 
 type LoginRequest struct {
 	Body struct {
