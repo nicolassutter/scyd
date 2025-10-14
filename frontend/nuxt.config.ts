@@ -6,6 +6,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@nuxt/eslint", "@nuxt/ui", "@vite-pwa/nuxt"],
   css: ["~/assets/css/main.css"],
+  devServer: {
+    port: 3001,
+  },
   pwa: {
     registerType: "autoUpdate",
     includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],

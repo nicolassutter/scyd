@@ -19,6 +19,7 @@
       },
       "devDependencies": {
         "@hey-api/openapi-ts": "0.85.1",
+        "@iconify-json/lucide": "^1.2.69",
         "@vite-pwa/assets-generator": "^1.0.1",
       },
     },
@@ -343,6 +344,8 @@
     "@humanwhocodes/module-importer": ["@humanwhocodes/module-importer@1.0.1", "", {}, "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA=="],
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
+
+    "@iconify-json/lucide": ["@iconify-json/lucide@1.2.69", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-xOhNf74m+C+nSCObfEqYi34dXk1GMfMUcOB+gfqKY/bn0RcsPLinGfgouOvrUFEreDEFbCti7sdheTf5HESLTA=="],
 
     "@iconify/collections": ["@iconify/collections@1.0.604", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-1Qfk0jL6ATAcAk0dfQDIn3M+Slzee7/WCn0/FatrIUJ7Ua6pLlUPd4/mLk/CGYuBFCoK6LTb8YTDgDB36LVDwg=="],
 

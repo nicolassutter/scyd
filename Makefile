@@ -5,7 +5,7 @@ install:
 	cd backend && go mod tidy
 
 dev:
-	bash -c 'cd backend && air' & bash -c 'cd frontend && bun run dev --port 3001'
+	bash -c 'cd backend && air' & bash -c 'cd frontend && bun run dev'
 	
 build_local:
 	docker build -t scyd:latest .

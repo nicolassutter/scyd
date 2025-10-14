@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.85.1",
+    "@iconify-json/lucide": "^1.2.69",
     "@vite-pwa/assets-generator": "^1.0.1"
   }
 }

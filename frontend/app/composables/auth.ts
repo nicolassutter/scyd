@@ -36,9 +36,9 @@ export const useAuth = createGlobalState(() => {
 
       return res.data;
     },
-    onSuccess: ({ username }) => {
+    onSuccess: async ({ username }) => {
       setUser({ username });
-      router.push("/");
+      await router.push("/");
     },
   });
 
@@ -46,9 +46,9 @@ export const useAuth = createGlobalState(() => {
     mutationFn: async () => {
       await logout();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       user.value = null;
-      router.push("/login");
+      await router.push("/login");
     },
   });
 
