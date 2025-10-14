@@ -28,6 +28,8 @@ type config struct {
 	Hooks Hooks           `yaml:"hooks"`
 }
 
+var DBPath = "./config/scyd.db"
+
 func newConfig() *config {
 	config := &config{
 		DownloadDir:       "/downloads",
