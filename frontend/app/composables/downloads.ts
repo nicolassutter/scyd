@@ -47,8 +47,10 @@ const emitter = mitt<{
 export const useDownloads = createGlobalState(() => {
   const apiBaseUrl = client.getConfig().baseUrl ?? "";
   const apiHost = apiBaseUrl ? new URL(apiBaseUrl).host : window.location.host;
+
+  const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
   const { data: websocketData, close } = useWebSocket(
-    `ws://${apiHost}/api/v1/ws/download`
+    `${wsProtocol}://${apiHost}/api/v1/ws/download`
   );
 
   const downloadsQueryOptions = queryOptions({
