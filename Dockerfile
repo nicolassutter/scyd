@@ -16,10 +16,11 @@ RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /us
 
 FROM golang:1.25-alpine AS build-go
 WORKDIR /app
+RUN apk add --no-cache gcc musl-dev
 COPY ./backend/go.mod ./backend/go.sum ./
 RUN go mod download
 COPY ./backend .
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/scyd main.go
+RUN CGO_ENABLED=1 go build -o bin/scyd main.go
 
 FROM oven/bun AS build-frontend
 WORKDIR /app
