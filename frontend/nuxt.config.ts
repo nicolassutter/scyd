@@ -52,4 +52,11 @@ export default defineNuxtConfig({
       },
     },
   },
+  typescript: {
+    tsConfig: {
+      compilerOptions: {
+        allowArbitraryExtensions: true,
+      },
+    },
+  },
 });

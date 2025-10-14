@@ -1,7 +1,16 @@
-import { queryOptions, useQuery, useQueryClient } from "@tanstack/vue-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/vue-query";
 import { createGlobalState, useWebSocket } from "@vueuse/core";
 import z from "zod";
-import { getApiV1Downloads, type Download } from "~/utils/client";
+import {
+  getApiV1Downloads,
+  postApiV1SortDownloads,
+  type Download,
+} from "~/utils/client";
 import { client } from "~/utils/client/client.gen";
 
 import mitt from "mitt";
@@ -83,9 +92,17 @@ export const useDownloads = createGlobalState(() => {
     });
   }
 
+  const sortDownloadsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await postApiV1SortDownloads();
+      return res.data;
+    },
+  });
+
   return {
     close,
     downloadsQuery,
+    sortDownloadsMutation,
     parsedWebsocketData,
     websocketEmitter: emitter,
     updateDownloadItemLocal,
