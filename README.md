@@ -1,37 +1,60 @@
-Scyd is a REST API + web ui built with Go and Vue.js to wrap multiple music downloaders.
+# Scyd 🎵
 
-It currently wraps yt-dlp and streamrip to support the current platforms:
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.0+-4FC08D?logo=vue.js)](https://vuejs.org)
 
-- YouTube
-- SoundCloud
-- Qobuz
-- Deezer
+A self-hosted music downloader with REST API and web interface built with Go and Vue.js. Scyd wraps multiple music downloaders to support various platforms and helps you build your personal music library.
 
-## Features
+## 🎯 Overview
 
-- REST API: call the api directly to download songs and playlist, create automated workflows and more
-- web ui: paste links in the ui and follow the download progress in real-time thanks to websockets
-- config: configure how the downloads behave with a simple yaml config file
-- organizer: when downloads finish, automatically organize songs in the right output directory so servers like Jellyfin or Plex can pick them up
-- pwa: the web UI is a PWA (it has to be served over https), this means you can install it on your device and enable the share functionality. Example: when browsing YouTube, you might want to download a song, you can then share the song you like with the share button, select the app you want to share with -> in this case scyd -> the app picks up the song's link and immediately starts a download!
+Scyd provides a unified interface for downloading music from multiple platforms using popular tools like yt-dlp and streamrip. Perfect for self-hosters and music enthusiasts who want to create and organize their personal music collections.
 
-## Quick start with docker
+### Supported Platforms
 
-**Docker run**
+- 🎥 **YouTube** - Videos and playlists
+- 🎧 **SoundCloud** - Tracks and sets
+- 🎼 **Qobuz** - High-quality audio
+- 🎵 **Deezer** - Music streaming platform
+
+## ✨ Features
+
+- **🔓 Open Source & Self-Hosted** - Complete control over your music downloads
+- **🔌 REST API** - Integrate with automation tools and custom workflows
+- **🖥️ Web Interface** - User-friendly UI with real-time download progress via WebSockets
+- **⚙️ Configurable** - Customize download behavior with YAML configuration
+- **📁 Auto-Organization** - Automatically organize downloaded music for media servers (Jellyfin, Plex)
+- **📱 Progressive Web App (PWA)** - Install on devices and use share functionality from other apps
+- **🔗 Share Integration** - Download music directly from your devices's share menu
+
+### PWA Share Feature
+
+When served over HTTPS, Scyd can be installed as a PWA on your devices. This enables powerful share functionality - simply share a YouTube link or SoundCloud track from your device, select Scyd, and the download starts automatically!
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker and/or Docker Compose
+- HTTPS setup (required for PWA features)
+- Basic understanding of YAML configuration
+
+### Docker Run
 
 ```bash
-docker run image_name:latest \
-    # WEB UI + REST API port, should be served by a reverse proxy on https
-    -p 3000:3000 \
-    # directory when songs are downloaded initially
-    -v ./downloads:/downloads \
-    # output dir where songs are placed on download success, this could be your Jellyfin library dir
-    -v ./output:/output \
-    # please create a config.yaml file in this directory
-    -v ./config:/app/config
+docker run -d \
+  --name scyd \
+  -p 3000:3000 \
+  -v ./downloads:/downloads \
+  -v ./output:/output \
+  -v ./config:/app/config \
+  --restart unless-stopped \
+  image_name:latest
 ```
 
-**Docker compose**
+### Docker Compose (Recommended)
+
+Create a `compose.yaml` file:
 
 ```yaml
 services:
@@ -39,10 +62,103 @@ services:
     image: image_name:latest
     container_name: scyd
     ports:
-      - "3000:3000" # WEB UI + REST API port, should be served by a reverse proxy on https
+      - "3000:3000" # Web UI + REST API
     volumes:
-      - ./downloads:/downloads # directory when songs are downloaded initially
-      - ./output:/output # output dir where songs are placed on download success, this could be your Jellyfin library dir
-      - ./config:/app/config # please create a config.yaml file in this directory
+      - ./downloads:/downloads # Temporary download directory
+      - ./output:/output # Final organized music library
+      - ./config:/app/config # Configuration directory
     restart: unless-stopped
+    environment:
+      - TZ=UTC # Set your timezone
 ```
+
+Run with:
+
+```bash
+docker-compose up -d
+```
+
+## 📁 Directory Structure
+
+| Path         | Purpose                                                      |
+| ------------ | ------------------------------------------------------------ |
+| `/downloads` | Temporary storage for downloads in progress                  |
+| `/output`    | Final organized music library (point your media server here) |
+| `/config`    | Configuration files directory                                |
+
+## ⚙️ Configuration
+
+Create a `config.yaml` file in your config directory.
+
+Example minimal configuration:
+
+```yaml
+users:
+  username1:
+    password_hash: "<bcrpt hashed password>"
+  username2:
+    password_hash: "<bcrpt hashed password>"
+
+sort_after_download: true # can disable automatic sorting
+
+hooks:
+  on_error: curl https://your-webhook-url/error
+  on_download_complete: curl https://your-webhook-url/success
+```
+
+## 🔧 Development
+
+### Local Development Setup
+
+Prequisites: bun, Go, Docker, air, make
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/nicolassutter/scyd.git
+   cd scyd
+   ```
+
+2. **Backend (Go)**
+
+   ```bash
+   cd backend
+   go mod download
+   ```
+
+3. **Frontend (Vue.js/Nuxt)**
+
+   ```bash
+   cd frontend
+   bun install
+   ```
+
+4. **Run Backend and Frontend**
+
+   ```bash
+   make dev
+   ```
+
+## 📖 API Documentation
+
+The REST API provides automatic documentation at `/docs`. Endpoints are protected with cookie-based authentication.
+You would first call the `/login` endpoint to obtain a session cookie and then send this cookie with subsequent requests.
+
+## 🤝 Contributing
+
+Do not hesitate to open issues or submit pull requests. Contributions are welcome!
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+- [streamrip](https://github.com/nathom/streamrip)
+- [Go Fiber](https://gofiber.io/)
+- [Nuxt.js](https://nuxt.com/)
+
+## ⚠️ Disclaimer
+
+This tool is for educational and personal use only. Please respect copyright laws and the terms of service of the platforms you download from. Users are responsible for ensuring their usage complies with applicable laws and platform policies.
