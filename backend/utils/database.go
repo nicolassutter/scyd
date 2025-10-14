@@ -13,7 +13,7 @@ var DB *gorm.DB
 
 func InitDatabase() error {
 	var err error
-	DB, err = gorm.Open(sqlite.Open(DBPath), &gorm.Config{
+	DB, err = gorm.Open(sqlite.Open(EnsureDbPath()), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent), // Reduce log verbosity
 	})
 	if err != nil {

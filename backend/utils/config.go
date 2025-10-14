@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -28,7 +29,20 @@ type config struct {
 	Hooks Hooks           `yaml:"hooks"`
 }
 
-var DBPath = "./config/scyd.db"
+func EnsureDbPath() string {
+	DBPath := "./config/scyd.db"
+
+	// Create database parent dir if it doesn't exist
+	dbPath := filepath.Clean(DBPath)
+	dbDir := filepath.Dir(dbPath)
+	err := os.MkdirAll(dbDir, os.ModePerm)
+
+	if err != nil {
+		log.Fatalf("Failed to create database directory: %v", err)
+	}
+
+	return DBPath
+}
 
 func newConfig() *config {
 	config := &config{

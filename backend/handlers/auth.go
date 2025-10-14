@@ -36,7 +36,7 @@ func setupSessionStore() *session.Store {
 	var isDevelopment = utils.IsDevelopment()
 
 	storage := sqlite3.New(sqlite3.Config{
-		Database: utils.DBPath,
+		Database: utils.EnsureDbPath(),
 		Table:    "auth_sessions",
 		Reset:    false,
 	})

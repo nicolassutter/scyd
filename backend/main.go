@@ -16,6 +16,12 @@ func main() {
 	// sets up the user config before anything else
 	utils.ReadUserConfigFile()
 
+	// Initialize database
+	err := utils.InitDatabase()
+	if err != nil {
+		log.Fatalf("Error initializing database: %s", err)
+	}
+
 	fiberApp := fiber.New()
 
 	if utils.IsDevelopment() {
@@ -75,12 +81,6 @@ func main() {
 			c.Set("Content-Type", "application/manifest+json")
 			return nil
 		})
-	}
-
-	// Initialize database
-	err := utils.InitDatabase()
-	if err != nil {
-		log.Fatalf("Error initializing database: %s", err)
 	}
 
 	fiberApp.Listen(":3000")

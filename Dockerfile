@@ -14,9 +14,8 @@ RUN pip3 install --no-cache-dir streamrip --upgrade
 RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp
 
-FROM golang:1.25-alpine AS build-go
+FROM golang:1.25-bookworm AS build-go
 WORKDIR /app
-RUN apk add --no-cache gcc musl-dev
 COPY ./backend/go.mod ./backend/go.sum ./
 RUN go mod download
 COPY ./backend .
