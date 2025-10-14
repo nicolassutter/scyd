@@ -24,6 +24,7 @@ Scyd provides a unified interface for downloading music from multiple platforms 
 - **🖥️ Web Interface** - User-friendly UI with real-time download progress via WebSockets
 - **⚙️ Configurable** - Customize download behavior with YAML configuration
 - **📁 Auto-Organization** - Automatically organize downloaded music for media servers (Jellyfin, Plex)
+- **🪝 Hooks** - Execute custom commands on download completion or errors
 - **📱 Progressive Web App (PWA)** - Install on devices and use share functionality from other apps
 - **🔗 Share Integration** - Download music directly from your devices's share menu
 
