@@ -50,7 +50,7 @@ docker run -d \
   -v ./output:/output \
   -v ./config:/app/config \
   --restart unless-stopped \
-  image_name:latest
+  ghcr.io/nicolassutter/scyd:latest
 ```
 
 ### Docker Compose (Recommended)
@@ -60,7 +60,7 @@ Create a `compose.yaml` file:
 ```yaml
 services:
   scyd:
-    image: image_name:latest
+    image: ghcr.io/nicolassutter/scyd:latest
     container_name: scyd
     ports:
       - "3000:3000" # Web UI + REST API
