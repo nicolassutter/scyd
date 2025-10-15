@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetApiV1AuthStatusData, GetApiV1AuthStatusErrors, GetApiV1AuthStatusResponses, GetApiV1DownloadsData, GetApiV1DownloadsErrors, GetApiV1DownloadsResponses, GetApiV1StatusData, GetApiV1StatusErrors, GetApiV1StatusResponses, PostApiV1AuthLoginData, PostApiV1AuthLoginErrors, PostApiV1AuthLoginResponses, PostApiV1AuthLogoutData, PostApiV1AuthLogoutErrors, PostApiV1AuthLogoutResponses, PostApiV1DownloadData, PostApiV1DownloadErrors, PostApiV1DownloadResponses, PostApiV1SortDownloadsData, PostApiV1SortDownloadsErrors, PostApiV1SortDownloadsResponses } from './types.gen';
+import type { DeleteApiV1DownloadByIdData, DeleteApiV1DownloadByIdErrors, DeleteApiV1DownloadByIdResponses, GetApiV1AuthStatusData, GetApiV1AuthStatusErrors, GetApiV1AuthStatusResponses, GetApiV1DownloadsData, GetApiV1DownloadsErrors, GetApiV1DownloadsResponses, GetApiV1StatusData, GetApiV1StatusErrors, GetApiV1StatusResponses, PostApiV1AuthLoginData, PostApiV1AuthLoginErrors, PostApiV1AuthLoginResponses, PostApiV1AuthLogoutData, PostApiV1AuthLogoutErrors, PostApiV1AuthLogoutResponses, PostApiV1DownloadData, PostApiV1DownloadErrors, PostApiV1DownloadResponses, PostApiV1SortDownloadsData, PostApiV1SortDownloadsErrors, PostApiV1SortDownloadsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -63,6 +63,16 @@ export const postApiV1Download = <ThrowOnError extends boolean = false>(options:
             'Content-Type': 'application/json',
             ...options.headers
         }
+    });
+};
+
+/**
+ * Delete API v1 download by ID
+ */
+export const deleteApiV1DownloadById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiV1DownloadByIdData, ThrowOnError>) => {
+    return (options.client ?? client).delete<DeleteApiV1DownloadByIdResponses, DeleteApiV1DownloadByIdErrors, ThrowOnError>({
+        url: '/api/v1/download/{id}',
+        ...options
     });
 };
 

@@ -62,6 +62,7 @@ func main() {
 
 	// Download routes (protected)
 	huma.Post(api_v1, "/download", handlers.DownloadHandler)
+	huma.Delete(api_v1, "/download/{id}", handlers.DeleteDownloadHandler)
 	huma.Post(api_v1, "/sort-downloads", handlers.SortDownloadsHandler)
 	huma.Get(api_v1, "/downloads", handlers.GetDownloadsHandler)
 

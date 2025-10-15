@@ -24,7 +24,8 @@ const logsScroller = useTemplateRef<HTMLElement>("logsScroller");
 
 const logs = ref<string[]>([]);
 
-const { websocketEmitter, updateDownloadItemLocal } = useDownloads();
+const { websocketEmitter, updateDownloadItemLocal, useDeleteDownload } =
+  useDownloads();
 
 const websocketEventName = `download-${props.id}` as `download-${number}`;
 
@@ -75,10 +76,17 @@ watch(
 const downloadState = computed(
   () => downloadStateSchema.safeParse(props.state).data
 );
+
+const deleteDownloadMutation = useDeleteDownload();
 </script>
 
 <template>
-  <UCard variant="subtle">
+  <UCard
+    variant="subtle"
+    :ui="{
+      body: 'empty:hidden',
+    }"
+  >
     <template #header>
       <div class="flex items-start gap-4">
         <div
@@ -95,8 +103,8 @@ const downloadState = computed(
           <UIcon name="i-lucide:download" class="w-8 h-8 text-blue-400" />
         </div>
 
-        <div>
-          <h3 class="text-lg font-semibold text-white mb-1 truncate">
+        <div class="w-full overflow-hidden">
+          <h3 class="text-lg font-semibold text-white mb-1 truncate w-full">
             {{ props.url }}
           </h3>
 
@@ -122,5 +130,16 @@ const downloadState = computed(
         last error message: {{ props.error_message }}
       </template>
     </div>
+
+    <template #footer>
+      <UButton
+        v-if="downloadState === 'success' || downloadState === 'error'"
+        title="Delete from database"
+        icon="i-lucide:trash"
+        color="error"
+        variant="subtle"
+        @click="() => deleteDownloadMutation.mutate(props.id)"
+      />
+    </template>
   </UCard>
 </template>

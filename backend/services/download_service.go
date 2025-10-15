@@ -25,6 +25,11 @@ func (ds *DownloadService) CreateDownload(url string) (*models.Download, error) 
 	return download, nil
 }
 
+func (ds *DownloadService) DeleteDownload(id uint) error {
+	result := utils.DB.Delete(&models.Download{}, id)
+	return result.Error
+}
+
 func (ds *DownloadService) UpdateDownloadState(id uint, state models.DownloadState, errorMessage string) error {
 	result := utils.DB.Model(&models.Download{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"state":         state,

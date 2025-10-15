@@ -7,6 +7,7 @@ import {
 import { createGlobalState, useWebSocket } from "@vueuse/core";
 import z from "zod";
 import {
+  deleteApiV1DownloadById,
   getApiV1Downloads,
   postApiV1SortDownloads,
   type Download,
@@ -101,6 +102,24 @@ export const useDownloads = createGlobalState(() => {
     },
   });
 
+  const useDeleteDownload = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        await deleteApiV1DownloadById({
+          path: {
+            id,
+          },
+        });
+      },
+      onSuccess: (_, id) => {
+        // Remove the download from the local cache
+        queryClient.setQueryData(downloadsQueryOptions.queryKey, (old) => {
+          if (!old) return old;
+          return old.filter((item) => item.id !== id);
+        });
+      },
+    });
+
   return {
     close,
     downloadsQuery,
@@ -108,5 +127,6 @@ export const useDownloads = createGlobalState(() => {
     parsedWebsocketData,
     websocketEmitter: emitter,
     updateDownloadItemLocal,
+    useDeleteDownload,
   };
 });

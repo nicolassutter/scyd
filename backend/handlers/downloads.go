@@ -330,3 +330,16 @@ func GetDownloadsHandler(ctx context.Context, input *struct{}) (*GetDownloadsRes
 		},
 	}, nil
 }
+
+func DeleteDownloadHandler(ctx context.Context, input *struct {
+	ID uint `required:"true" path:"id"`
+}) (*struct{}, error) {
+	downloadService := services.NewDownloadService()
+
+	err := downloadService.DeleteDownload(input.ID)
+	if err != nil {
+		return nil, huma.Error500InternalServerError("Failed to delete download: " + err.Error())
+	}
+
+	return nil, nil
+}

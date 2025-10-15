@@ -9,7 +9,10 @@ const actions = computed<DropdownMenuItem[]>(() => [
     label: "Sort downloads directory",
     icon: "i-lucide:arrow-down-up",
     loading: sortDownloadsMutation.isPending.value,
-    onSelect: () => {
+    onSelect: (e) => {
+      // stop from closing the dropdown
+      e.preventDefault();
+
       sortDownloadsMutation.mutate(undefined, {
         onSuccess(result) {
           if (result?.files_with_errors?.length) {

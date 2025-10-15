@@ -302,6 +302,33 @@ export type PostApiV1DownloadResponses = {
 
 export type PostApiV1DownloadResponse = PostApiV1DownloadResponses[keyof PostApiV1DownloadResponses];
 
+export type DeleteApiV1DownloadByIdData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/download/{id}';
+};
+
+export type DeleteApiV1DownloadByIdErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type DeleteApiV1DownloadByIdError = DeleteApiV1DownloadByIdErrors[keyof DeleteApiV1DownloadByIdErrors];
+
+export type DeleteApiV1DownloadByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiV1DownloadByIdResponse = DeleteApiV1DownloadByIdResponses[keyof DeleteApiV1DownloadByIdResponses];
+
 export type GetApiV1DownloadsData = {
     body?: never;
     path?: never;
