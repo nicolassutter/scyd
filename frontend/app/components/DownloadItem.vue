@@ -30,14 +30,27 @@ const websocketEventName = `download-${props.id}` as `download-${number}`;
 
 // Listen for websocket events specific to this download item
 websocketEmitter.on(websocketEventName, (incomingMessage) => {
-  if (incomingMessage.event === "progress") {
-    logs.value.push(incomingMessage.data);
-  } else if (incomingMessage.event === "success") {
-    logs.value.push("✅ Download completed successfully.");
-    updateDownloadItemLocal(props.id, {
-      state: "success" satisfies DownloadState,
-    });
-    close();
+  switch (true) {
+    case incomingMessage.event === "progress":
+      logs.value.push(incomingMessage.data);
+      break;
+
+    case incomingMessage.event === "success":
+      logs.value.push("✅ Download completed successfully.");
+      updateDownloadItemLocal(props.id, {
+        state: "success" satisfies DownloadState,
+      });
+      close();
+      break;
+
+    case incomingMessage.event === "error":
+      logs.value.push(`❌ Error: ${incomingMessage.data}`);
+      updateDownloadItemLocal(props.id, {
+        state: "error" satisfies DownloadState,
+        error_message: incomingMessage.data,
+      });
+      close();
+      break;
   }
 });
 
