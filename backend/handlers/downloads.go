@@ -236,99 +236,64 @@ func DownloadHandler(ctx context.Context, input *struct {
 		return nil, huma.Error500InternalServerError("Failed to create download record")
 	}
 
-	isYoutube := strings.Contains(input.Body.Url, "youtube.com") || strings.Contains(input.Body.Url, "youtu.be")
-
 	var cmd *exec.Cmd
 
 	isDevelopment := utils.IsDevelopment()
 
-	if isYoutube {
-		additionalArgs := []string{}
-		if input.Body.YtDlpArgs != "" {
-			additionalArgs, err = shlex.Split(input.Body.YtDlpArgs)
-			if err != nil {
-				return nil, huma.Error400BadRequest(fmt.Sprintf(
-					"Failed to parse additional yt-dlp args '%s': %s\n", input.Body.YtDlpArgs, err.Error(),
-				))
-			}
+	additionalArgs := []string{}
+	if input.Body.YtDlpArgs != "" {
+		additionalArgs, err = shlex.Split(input.Body.YtDlpArgs)
+		if err != nil {
+			return nil, huma.Error400BadRequest(fmt.Sprintf(
+				"Failed to parse additional yt-dlp args '%s': %s\n", input.Body.YtDlpArgs, err.Error(),
+			))
 		}
-
-		devDockerPrefix := []string{
-			"docker",
-			"run",
-			"--rm",
-			"-v",
-			utils.UserConfig.DownloadDir + ":" + utils.UserConfig.DownloadDir,
-			"scyd",
-		}
-
-		ytDlpBaseCommand := []string{
-			"yt-dlp",
-			"-o",
-			utils.UserConfig.DownloadDir + "/%(title)s.%(ext)s",
-			"--extract-audio",
-			"--audio-format",
-			"mp3",
-			"--audio-quality",
-			"0",
-			"--embed-thumbnail",
-			"--add-metadata",
-			"--progress",  // Force progress output
-			"--newline",   // Force newlines in output
-			"--no-colors", // Disable colors for cleaner parsing
-		}
-
-		command := []string{}
-
-		// run inside a docker container in development
-		if isDevelopment {
-			command = append(command, devDockerPrefix...)
-			command = append(command, ytDlpBaseCommand...)
-		} else {
-			// in production just run yt-dlp directly
-			command = append(command, ytDlpBaseCommand...)
-		}
-
-		// add additional args from request
-		command = append(command, additionalArgs...)
-
-		// finally add the url
-		command = append(command, input.Body.Url)
-
-		cmd = exec.Command(command[0], command[1:]...)
-	} else {
-		// handle other platforms like Soundcloud with streamrip
-
-		devDockerPrefix := []string{
-			"docker",
-			"run",
-			"--rm",
-			"-v",
-			utils.UserConfig.DownloadDir + ":" + utils.UserConfig.DownloadDir,
-			"scyd",
-		}
-
-		baseCmd := []string{
-			"rip",
-			"-f",
-			utils.UserConfig.DownloadDir,
-			"url",
-			input.Body.Url,
-		}
-
-		command := []string{}
-
-		// run inside a docker container in development
-		if isDevelopment {
-			command = append(command, devDockerPrefix...)
-			command = append(command, baseCmd...)
-		} else {
-			// in production just run rip directly
-			command = append(command, baseCmd...)
-		}
-
-		cmd = exec.Command(command[0], command[1:]...)
 	}
+
+	devDockerPrefix := []string{
+		"docker",
+		"run",
+		"--rm",
+		"-v",
+		utils.UserConfig.DownloadDir + ":" + utils.UserConfig.DownloadDir,
+		"scyd",
+	}
+
+	ytDlpBaseCommand := []string{
+		"yt-dlp",
+		"-o",
+		utils.UserConfig.DownloadDir + "/%(title)s.%(ext)s",
+		"--extract-audio",
+		"--audio-format",
+		"mp3",
+		"--audio-quality",
+		"0",
+		"--embed-thumbnail",
+		"--embed-metadata",
+		"--windows-filenames",
+		"--progress",  // Force progress output
+		"--newline",   // Force newlines in output
+		"--no-colors", // Disable colors for cleaner parsing
+	}
+
+	command := []string{}
+
+	// run inside a docker container in development
+	if isDevelopment {
+		command = append(command, devDockerPrefix...)
+		command = append(command, ytDlpBaseCommand...)
+	} else {
+		// in production just run yt-dlp directly
+		command = append(command, ytDlpBaseCommand...)
+	}
+
+	// add additional args from request
+	command = append(command, additionalArgs...)
+
+	// finally add the url
+	command = append(command, input.Body.Url)
+
+	cmd = exec.Command(command[0], command[1:]...)
 
 	// Start the download task in a separate goroutine so we don't block
 	go startDownloadTaskWS(download.ID, cmd)
