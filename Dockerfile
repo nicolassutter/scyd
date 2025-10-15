@@ -5,8 +5,8 @@ RUN apk add --no-cache \
     ffmpeg \
     wget
 
-# Install yt-dlp
-RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp && \
+# Install yt-dlp for musl libc (Alpine) | would use the glibc version on Debian/Ubuntu
+RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_musllinux -O /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp
 
 FROM golang:1.25-bookworm AS build-go
