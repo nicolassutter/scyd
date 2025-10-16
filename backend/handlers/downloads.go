@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -262,7 +263,7 @@ func DownloadHandler(ctx context.Context, input *struct {
 	ytDlpBaseCommand := []string{
 		"yt-dlp",
 		"-o",
-		utils.UserConfig.DownloadDir + "/%(title)s.%(ext)s",
+		filepath.Join(utils.UserConfig.DownloadDir, "%(title)s - [%(extractor)s] [%(track_id,id)s].%(ext)s"),
 		"--extract-audio",
 		"--audio-format",
 		"mp3",
