@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/nicolassutter/scyd/utils"
@@ -62,7 +63,7 @@ func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 			continue
 		}
 
-		filePath := utils.UserConfig.DownloadDir + "/" + file.Name()
+		filePath := filepath.Join(utils.UserConfig.DownloadDir, file.Name())
 		metadata, err := utils.GetMetadataFromFile(filePath)
 
 		if err != nil {
@@ -81,7 +82,7 @@ func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 			album = "Unknown Album"
 		}
 
-		newDir := utils.UserConfig.OutputDir + "/" + artist + "/" + album
+		newDir := filepath.Join(utils.UserConfig.OutputDir, artist, album)
 
 		err = os.MkdirAll(newDir, os.ModePerm)
 
@@ -91,7 +92,7 @@ func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 			continue
 		}
 
-		newFilePath := newDir + "/" + file.Name()
+		newFilePath := filepath.Join(newDir, file.Name())
 
 		// copy the file to the new location
 		err = copyFile(filePath, newFilePath)
