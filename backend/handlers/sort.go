@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/nicolassutter/scyd/utils"
@@ -46,6 +47,30 @@ func copyFile(src, dst string) error {
 	return os.Chmod(dst, sourceInfo.Mode())
 }
 
+// removes or replaces characters that are invalid in file/directory names
+// Windows forbidden characters: < > : " / \ | ? *
+// Also removes leading/trailing spaces and dots which can cause issues
+func sanitizePathComponent(name string) string {
+	// Replace forbidden characters with underscore
+	replacer := strings.NewReplacer(
+		"<", "_",
+		">", "_",
+		":", "_",
+		"\"", "_",
+		"/", "_",
+		"\\", "_",
+		"|", "_",
+		"?", "_",
+		"*", "_",
+	)
+	sanitized := replacer.Replace(name)
+
+	// Trim leading/trailing spaces and dots
+	sanitized = strings.Trim(sanitized, " .")
+
+	return sanitized
+}
+
 // sort every audio file in the downloads dir into artist/album folders, then move them to the output dir
 func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 	files, err := os.ReadDir(utils.UserConfig.DownloadDir)
@@ -77,11 +102,16 @@ func SortDownloadsDirectory() (*SortDownloadsResponse, error) {
 			artist = "Unknown Artist"
 		}
 
-		album := metadata.Album()
-		if album == "" {
-			album = "Unknown Album"
+		artist = sanitizePathComponent(artist)
+
+		if artist == "" {
+			artist = "Unknown Artist"
 		}
 
+		album := sanitizePathComponent(metadata.Album())
+
+		// If album is empty, filepath.Join will skip it, creating: /output/Artist/file.mp3
+		// If album exists, it creates: /output/Artist/Album/file.mp3
 		newDir := filepath.Join(utils.UserConfig.OutputDir, artist, album)
 
 		err = os.MkdirAll(newDir, os.ModePerm)
