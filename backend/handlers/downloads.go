@@ -263,7 +263,8 @@ func DownloadHandler(ctx context.Context, input *struct {
 	ytDlpBaseCommand := []string{
 		"yt-dlp",
 		"-o",
-		filepath.Join(utils.UserConfig.DownloadDir, "%(title)s - [%(extractor)s] [%(track_id,id)s].%(ext)s"),
+		// output template: optional_artist dash_if_artist_not_empty title - [extractor] [track_id].ext
+		filepath.Join(utils.UserConfig.DownloadDir, "%(artist)s%(artist& - )s%(title)s - [%(extractor)s] [%(track_id,id)s].%(ext)s"),
 		"--extract-audio",
 		"--audio-format",
 		"mp3",
