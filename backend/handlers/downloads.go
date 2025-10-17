@@ -68,6 +68,43 @@ type DownloadMessage struct {
 var clients = make(map[string]*socketio.Websocket)
 var clientsMutex sync.RWMutex
 
+type DownloadManager struct {
+	downloads map[uint]context.CancelFunc
+	mu        sync.RWMutex
+}
+
+var downloadManager = &DownloadManager{
+	downloads: make(map[uint]context.CancelFunc),
+}
+
+// stores a cancel function for a download
+func (dm *DownloadManager) StoreDownload(downloadID uint, cancel context.CancelFunc) {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	dm.downloads[downloadID] = cancel
+}
+
+// cancels a download and removes it from the map
+// returns `true` if a download was cancelled or `false` if not found
+func (dm *DownloadManager) CancelDownload(downloadID uint) bool {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+
+	if cancel, exists := dm.downloads[downloadID]; exists {
+		cancel()
+		delete(dm.downloads, downloadID)
+		return true
+	}
+	return false
+}
+
+// removes a download from the map (for cleanup after completion)
+func (dm *DownloadManager) RemoveDownload(downloadID uint) {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	delete(dm.downloads, downloadID)
+}
+
 // WebSocket handler for download connections
 func SetupDownloadWebSocket(router *fiber.Router) {
 	socketio.On(socketio.EventDisconnect, func(payload *socketio.EventPayload) {
@@ -92,13 +129,31 @@ func SetupDownloadWebSocket(router *fiber.Router) {
 	}))
 }
 
-func startDownloadTaskWS(downloadID uint, cmd *exec.Cmd) {
+func startDownloadTaskWS(downloadID uint, commandArgs []string) {
 	downloadService := services.NewDownloadService()
 	var errorMessage string
 
+	// Create context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Store cancel function for potential cancellation
+	downloadManager.StoreDownload(downloadID, cancel)
+
+	// Ensure download is removed from map when done
+	defer downloadManager.RemoveDownload(downloadID)
+
 	defer func() {
 		// Update download state based on command result
-		if cmd.ProcessState != nil && cmd.ProcessState.Success() {
+
+		// the context was cancelled
+		if ctx.Err() == context.Canceled {
+			downloadService.UpdateDownloadState(downloadID, models.DownloadStateError, "Download cancelled")
+			broadcastDownloadMessage(DownloadMessage{
+				Event:      DownloadEventError,
+				DownloadID: downloadID,
+				Data:       "Download cancelled",
+			})
+		} else if errorMessage == "" { // success
 			downloadService.UpdateDownloadState(downloadID, models.DownloadStateSuccess, "")
 			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnDownloadComplete)
 			// Broadcast success message
@@ -107,10 +162,7 @@ func startDownloadTaskWS(downloadID uint, cmd *exec.Cmd) {
 				DownloadID: downloadID,
 				Data:       "Download completed successfully",
 			})
-		} else {
-			if errorMessage == "" {
-				errorMessage = "Download failed"
-			}
+		} else { // error occurred
 			downloadService.UpdateDownloadState(downloadID, models.DownloadStateError, errorMessage)
 			utils.ExecuteCommandBg(utils.UserConfig.Hooks.OnError)
 
@@ -142,7 +194,9 @@ func startDownloadTaskWS(downloadID uint, cmd *exec.Cmd) {
 		}
 	}()
 
-	// Create pipes to capture both stdout and stderr
+	// create a command instance with our context for automatic cancellation
+	cmd := exec.CommandContext(ctx, commandArgs[0], commandArgs[1:]...)
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		errorMessage = "Failed to get command stdout: " + err.Error()
@@ -219,8 +273,12 @@ func startDownloadTaskWS(downloadID uint, cmd *exec.Cmd) {
 		}
 	}()
 
-	// Wait for the command to finish
-	cmd.Wait()
+	// Wait for the command to finish (or be cancelled)
+	err = cmd.Wait()
+	// Check if context was cancelled otherwise capture error
+	if err != nil && ctx.Err() != context.Canceled {
+		errorMessage = "Command failed: " + err.Error()
+	}
 }
 
 // DownloadHandler handles download requests with WebSocket streaming
@@ -236,8 +294,6 @@ func DownloadHandler(ctx context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError("Failed to create download record")
 	}
-
-	var cmd *exec.Cmd
 
 	isDevelopment := utils.IsDevelopment()
 
@@ -278,27 +334,25 @@ func DownloadHandler(ctx context.Context, input *struct {
 		"--no-colors", // Disable colors for cleaner parsing
 	}
 
-	command := []string{}
+	downloadCommandArgs := []string{}
 
 	// run inside a docker container in development
 	if isDevelopment {
-		command = append(command, devDockerPrefix...)
-		command = append(command, ytDlpBaseCommand...)
+		downloadCommandArgs = append(downloadCommandArgs, devDockerPrefix...)
+		downloadCommandArgs = append(downloadCommandArgs, ytDlpBaseCommand...)
 	} else {
 		// in production just run yt-dlp directly
-		command = append(command, ytDlpBaseCommand...)
+		downloadCommandArgs = append(downloadCommandArgs, ytDlpBaseCommand...)
 	}
 
 	// add additional args from request
-	command = append(command, additionalArgs...)
+	downloadCommandArgs = append(downloadCommandArgs, additionalArgs...)
 
 	// finally add the url
-	command = append(command, input.Body.Url)
-
-	cmd = exec.Command(command[0], command[1:]...)
+	downloadCommandArgs = append(downloadCommandArgs, input.Body.Url)
 
 	// Start the download task in a separate goroutine so we don't block
-	go startDownloadTaskWS(download.ID, cmd)
+	go startDownloadTaskWS(download.ID, downloadCommandArgs)
 
 	fmt.Printf("Download started for: %s to %s\n", input.Body.Url, utils.UserConfig.DownloadDir)
 
@@ -344,4 +398,14 @@ func DeleteDownloadHandler(ctx context.Context, input *struct {
 	}
 
 	return nil, nil
+}
+
+func CancelDownloadHandler(ctx context.Context, input *struct {
+	ID uint `required:"true" path:"id"`
+}) (*struct{}, error) {
+	if downloadManager.CancelDownload(input.ID) {
+		return nil, nil
+	}
+
+	return nil, huma.Error409Conflict("No active download with the given ID")
 }
