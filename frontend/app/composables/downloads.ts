@@ -9,6 +9,7 @@ import z from "zod";
 import {
   deleteApiV1DownloadById,
   getApiV1Downloads,
+  postApiV1DownloadCancelById,
   postApiV1SortDownloads,
   type Download,
 } from "~/utils/client";
@@ -120,6 +121,17 @@ export const useDownloads = createGlobalState(() => {
       },
     });
 
+  const useCancelDownload = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        await postApiV1DownloadCancelById({
+          path: {
+            id,
+          },
+        });
+      },
+    });
+
   return {
     close,
     downloadsQuery,
@@ -128,5 +140,6 @@ export const useDownloads = createGlobalState(() => {
     websocketEmitter: emitter,
     updateDownloadItemLocal,
     useDeleteDownload,
+    useCancelDownload,
   };
 });

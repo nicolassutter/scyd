@@ -24,8 +24,12 @@ const logsScroller = useTemplateRef<HTMLElement>("logsScroller");
 
 const logs = ref<string[]>([]);
 
-const { websocketEmitter, updateDownloadItemLocal, useDeleteDownload } =
-  useDownloads();
+const {
+  websocketEmitter,
+  updateDownloadItemLocal,
+  useDeleteDownload,
+  useCancelDownload,
+} = useDownloads();
 
 const websocketEventName = `download-${props.id}` as `download-${number}`;
 
@@ -78,6 +82,7 @@ const downloadState = computed(
 );
 
 const deleteDownloadMutation = useDeleteDownload();
+const cancelDownloadMutation = useCancelDownload();
 </script>
 
 <template>
@@ -139,6 +144,14 @@ const deleteDownloadMutation = useDeleteDownload();
         color="error"
         variant="subtle"
         @click="() => deleteDownloadMutation.mutate(props.id)"
+      />
+      <UButton
+        v-else
+        title="Cancel download"
+        icon="i-lucide:square-x"
+        color="warning"
+        variant="subtle"
+        @click="() => cancelDownloadMutation.mutate(props.id)"
       />
     </template>
   </UCard>
