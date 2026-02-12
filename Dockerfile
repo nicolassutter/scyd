@@ -26,4 +26,5 @@ RUN bun run generate
 FROM runtime-base
 COPY --from=build-go /app/bin/scyd /app/scyd
 COPY --from=build-frontend /app/.output/public /app/public
-CMD ["/bin/sh", "-c", "GO_ENV=production ./scyd"]
+ENV GO_ENV=production
+CMD ["/bin/sh", "-c", "./scyd"]

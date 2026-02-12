@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -71,7 +72,8 @@ func main() {
 	handlers.SetupDownloadWebSocket(&fiberApiV1)
 
 	if !utils.IsDevelopment() {
-		fiberApp.Static("/", "./public")
+		fmt.Println("Running in production mode, serving static files from ./public")
+
 		/**
 		 * Serve manifest.webmanifest with correct MIME type
 		 */
@@ -83,6 +85,8 @@ func main() {
 			c.Set("Content-Type", "application/manifest+json")
 			return nil
 		})
+
+		fiberApp.Static("/", "./public")
 	}
 
 	fiberApp.Listen(":3000")
