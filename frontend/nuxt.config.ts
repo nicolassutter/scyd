@@ -51,6 +51,7 @@ export default defineNuxtConfig({
         },
       },
     },
+    registerWebManifestInRouteRules: true,
   },
   typescript: {
     tsConfig: {
