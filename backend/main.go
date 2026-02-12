@@ -86,7 +86,10 @@ func main() {
 			return nil
 		})
 
+		// serve frontend static files
 		fiberApp.Static("/", "./public")
+		// serve custom user provided static files
+		fiberApp.Static("/", utils.UserConfig.PublicDir)
 	}
 
 	fiberApp.Listen(":3000")

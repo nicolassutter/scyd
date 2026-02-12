@@ -22,6 +22,7 @@ type Hooks struct {
 type config struct {
 	DownloadDir string `yaml:"download_dir"`
 	OutputDir   string `yaml:"output_dir"`
+	PublicDir   string `yaml:"public_dir"`
 	// Automatically sort downloads after each download completes
 	SortAfterDownload bool `yaml:"sort_after_download"`
 	// Users for authentication
@@ -51,6 +52,7 @@ func newConfig() *config {
 		SortAfterDownload: true,
 		Users:             make(map[string]User),
 		Hooks:             Hooks{},
+		PublicDir:         "/public",
 	}
 	return config
 }
